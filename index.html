@@ -1,1 +1,1338 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>설비 설치 도우미</title>
+<style>
+:root{
+  --bg:#f3f4f6; --card:#fff; --ink:#111827; --muted:#6b7280; --line:#d1d5db;
+  --pri:#1d4ed8; --pri-soft:#dbeafe; --ok:#15803d; --ok-soft:#dcfce7;
+  --ng:#b91c1c; --ng-soft:#fee2e2; --warn:#b45309; --warn-soft:#fef3c7;
+  --hl:#ea580c;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;font-size:17px;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+header{position:sticky;top:0;z-index:5;background:var(--ink);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px}
+header h1{font-size:18px;margin:0;flex:1;font-weight:700}
+.pill{font-size:12px;padding:4px 8px;border-radius:999px;background:#374151;white-space:nowrap}
+.pill.ok{background:#166534}
+main{padding:12px 12px 150px;max-width:720px;margin:0 auto}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;z-index:6;display:flex;background:#fff;border-top:1px solid var(--line)}
+nav.tabs button{flex:1;border:0;background:none;padding:10px 0 12px;font-size:15px;font-weight:600;color:var(--muted)}
+nav.tabs button.on{color:var(--pri);box-shadow:inset 0 3px 0 var(--pri)}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.card h2{font-size:18px;margin:0 0 8px}
+.card h3{font-size:16px;margin:12px 0 6px}
+.muted{color:var(--muted);font-size:14px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px}
+.chip{border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 12px;min-width:92px;text-align:left;flex:none}
+.chip b{display:block;font-size:17px}
+.chip span{font-size:12px;color:var(--muted)}
+.chip.on{border-color:var(--pri);background:var(--pri-soft)}
+.chip.done{border-color:var(--ok)}
+.btn{border:0;border-radius:12px;padding:13px 16px;font-weight:700;background:var(--pri);color:#fff;min-height:50px}
+.btn.sec{background:#e5e7eb;color:var(--ink)}
+.btn.ok{background:var(--ok)}
+.btn.ng{background:var(--ng)}
+.btn.sm{padding:8px 12px;min-height:40px;font-size:15px}
+.btn:disabled{opacity:.4}
+.stepnav{position:fixed;left:0;right:0;bottom:56px;z-index:5;background:rgba(243,244,246,.97);padding:8px 12px;border-top:1px solid var(--line)}
+.stepnav .in{max-width:720px;margin:0 auto;display:flex;gap:8px}
+.stepnav .btn{flex:1}
+.prog{height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;margin:6px 0 10px}
+.prog i{display:block;height:100%;background:var(--pri)}
+.dots{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.dots button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:13px;font-weight:700;padding:0}
+.dots button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.dots button.ok{border-color:var(--ok);color:var(--ok)}
+.dots button.ng{border-color:var(--ng);color:var(--ng)}
+.dots button.on.ok,.dots button.on.ng{color:#fff}
+.how{margin:6px 0 0;padding-left:20px}
+.how li{margin:4px 0;line-height:1.45}
+svg.dia{width:100%;height:auto;background:#fafafa;border:1px solid var(--line);border-radius:10px}
+.field{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
+.field .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.field .lbl{font-weight:700}
+.tape{font-size:34px;font-weight:800;letter-spacing:.5px;line-height:1.1}
+.tape small{font-size:14px;font-weight:600;color:var(--muted);margin-left:4px}
+.inputs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.inputs label{font-size:13px;color:var(--muted)}
+.inputs input{width:100%;font-size:22px;font-weight:700;padding:10px;border:2px solid var(--line);border-radius:10px;background:#fff}
+.inputs input:focus{outline:none;border-color:var(--pri)}
+.res{margin-top:8px;padding:8px 10px;border-radius:10px;font-weight:700;font-size:15px}
+.res.ok{background:var(--ok-soft);color:var(--ok)}
+.res.ng{background:var(--ng-soft);color:var(--ng)}
+.res.warn{background:var(--warn-soft);color:var(--warn)}
+.res.info{background:#f3f4f6;color:var(--muted)}
+.banner{padding:12px;border-radius:12px;margin-top:10px;font-weight:700;line-height:1.5}
+.banner.ok{background:var(--ok-soft);color:var(--ok)}
+.banner.ng{background:var(--ng-soft);color:var(--ng)}
+.banner.warn{background:var(--warn-soft);color:var(--warn)}
+.chk{display:flex;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:12px;margin-top:8px;cursor:pointer}
+.chk input{width:26px;height:26px;flex:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid2 label,.f label{font-size:13px;color:var(--muted);display:block;margin-bottom:2px}
+.grid2 input,.f input,.f textarea,.f select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:17px;background:#fff}
+.f{margin-top:8px}
+.grid2 select,.f select,.field select{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:#fff}
+.top input:not([type=checkbox]){width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:#fff}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{flex:1;border:0;background:#fff;padding:10px;font-weight:700}
+.seg button.on{background:var(--pri);color:#fff}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{border-bottom:1px solid #e5e7eb;padding:6px 4px;text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:600}
+td.ok{color:var(--ok);font-weight:700}
+td.ng{color:var(--ng);font-weight:700}
+.photos{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.ph{border:2px dashed var(--line);border-radius:12px;min-height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;text-align:center;font-size:14px;color:var(--muted);padding:6px}
+.ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ph .cap{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;font-size:12px;padding:3px}
+.ph input{position:absolute;inset:0;opacity:0}
+.calc .out{font-size:26px;font-weight:800;margin-top:6px}
+.toast{position:fixed;left:50%;bottom:130px;transform:translateX(-50%);background:#111827;color:#fff;padding:10px 16px;border-radius:999px;font-size:15px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90%}
+.toast.show{opacity:1}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:30;display:none;align-items:center;justify-content:center;padding:20px}
+.modal.show{display:flex}
+.modal .box{background:#fff;border-radius:16px;padding:18px;max-width:420px;width:100%}
+.modal .row{justify-content:flex-end;margin-top:14px}
+.hide{display:none!important}
+.lvgrid{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px 8px;align-items:start;margin-top:8px}
+.lvgrid .hd{font-size:13px;color:var(--muted);font-weight:700;text-align:center}
+.lvgrid .no{font-weight:800;padding-top:12px;font-size:15px}
+.lvgrid input{width:100%;font-size:20px;font-weight:700;padding:9px;border:2px solid var(--line);border-radius:10px;background:#fff}
+.lvgrid input:focus{outline:none;border-color:var(--pri)}
+.adj{font-size:13px;font-weight:700;margin-top:3px;text-align:center;min-height:17px}
+.adj.up{color:#1d4ed8}.adj.dn{color:#b45309}.adj.z{color:var(--ok)}
+.rounds{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.rounds button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;font-weight:700}
+.rounds button.on{background:var(--pri);color:#fff;border-color:var(--pri)}
+.kpi{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px}
+.kpi div{background:#f9fafb;border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center}
+.kpi b{display:block;font-size:20px}
+.kpi span{font-size:12px;color:var(--muted)}
+.kpi .ok b{color:var(--ok)}.kpi .ng b{color:var(--ng)}
+details.card summary{font-weight:700;font-size:17px;cursor:pointer}
+ol.order{padding-left:20px;margin:6px 0}ol.order li{margin:3px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>설비 설치 도우미</h1>
+  <span id="sync" class="pill">이 기기에 저장</span>
+</header>
+<main id="main"></main>
+<div id="stepnav" class="stepnav hide"><div class="in">
+  <button class="btn sec" id="prevBtn">이전</button>
+  <button class="btn" id="nextBtn">다음</button>
+</div></div>
+<nav class="tabs" id="tabs">
+  <button data-tab="work" class="on">작업</button>
+  <button data-tab="est">견적</button>
+  <button data-tab="setup">설비</button>
+  <button data-tab="record">기록</button>
+  <button data-tab="calc">계산</button>
+</nav>
+<div class="toast" id="toast"></div>
+<div class="modal" id="modal"><div class="box">
+  <div id="modalMsg"></div>
+  <div class="row"><button class="btn sec sm" id="modalNo">취소</button><button class="btn ng sm" id="modalYes">확인</button></div>
+</div></div>
 
+<script>
+(function(){
+'use strict';
+
+/* ---------- 기본 데이터 ---------- */
+var LS_KEY = 'linemark-v1';
+var LS_PHOTO = 'linemark-photos-v1';
+
+function defaultUnit(name, note, sched){
+  return {id: 'u' + Math.random().toString(36).slice(2,8), name:name, note:note||'', sched:sched||'',
+    L:7430, W:1462, X:500, Y:null, P1:null, P2:null, ports:'',
+    meas:{}, checks:{}, worker:'', checker:'', done:null};
+}
+function defaultState(){
+  return {
+    v:1, savedAt:0,
+    settings:{offset:100, tolOuter:3, tolDiag:5, worker:'', presets:[{name:'N2 Stocker', L:7430, W:1462}]},
+    units:[
+      defaultUnit('#117','14열 7단','11/11~01/19'),
+      defaultUnit('#115','14열 7단','11/04~01/12'),
+      defaultUnit('#116','14열 7단','11/04~01/12')
+    ],
+    cur:{unit:0, step:0}, tab:'work'
+  };
+}
+
+var state = loadLocal() || defaultState();
+var photos = loadPhotos();
+if(state.tab === 'level') state.tab = 'work';
+state.units.forEach(function(u){ if(u.lev && u.lev.checks){ ['lk1','lk2','lk3'].forEach(function(k){ if(u.lev.checks[k]) u.checks[k] = true; }); } });
+if(!state.settings.presets) state.settings.presets = [{name:'N2 Stocker', L:7430, W:1462}];
+
+function loadLocal(){
+  try{ var s = localStorage.getItem(LS_KEY); if(s){ var o = JSON.parse(s); if(o && o.units) return o; } }catch(e){}
+  return null;
+}
+function loadPhotos(){
+  try{ var s = localStorage.getItem(LS_PHOTO); if(s) return JSON.parse(s) || {}; }catch(e){}
+  return {};
+}
+function savePhotos(){
+  try{ localStorage.setItem(LS_PHOTO, JSON.stringify(photos)); return true; }
+  catch(e){ toast('사진 저장 공간이 부족합니다. 기록 탭에서 오래된 사진을 지워 주세요.'); return false; }
+}
+
+/* ---------- 저장 (로컬 + 클라우드) ---------- */
+var dbRef = null, saveTimer = null, writing = false, pendingWrite = false;
+function save(){
+  state.savedAt = Date.now();
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
+  if(dbRef){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(pushCloud, 1500);
+    setSync('동기화 중…', false);
+  }
+}
+function pushCloud(){
+  if(!dbRef) return;
+  if(writing){ pendingWrite = true; return; }
+  writing = true;
+  var body = JSON.parse(JSON.stringify(state));
+  dbRef.set(body).then(function(){
+    setSync('클라우드 저장됨', true);
+  }).catch(function(e){
+    if(e && e.code === 'quota_exceeded') toast('클라우드 저장 공간이 가득 찼습니다.');
+    setSync('이 기기에 저장', false);
+  }).then(function(){
+    writing = false;
+    if(pendingWrite){ pendingWrite = false; pushCloud(); }
+  });
+}
+function setSync(t, ok){ var el = document.getElementById('sync'); el.textContent = t; el.className = 'pill' + (ok ? ' ok' : ''); }
+
+function initCloud(){
+  if(!window.claude || !window.claude.use) return;
+  Promise.all([window.claude.use('db'), window.claude.use('user')]).then(function(r){
+    var db = r[0], user = r[1];
+    if(!db || !user) return null;
+    return user.id().then(function(uid){
+      if(!uid) return null;
+      var ref = db.doc('data/users/' + uid + '/linemark');
+      var timer = setTimeout(function(){ setSync('이 기기에 저장', false); }, 10000);
+      return ref.get().then(function(snap){
+        clearTimeout(timer);
+        dbRef = ref;
+        if(snap.exists){
+          var d = snap.data();
+          if(d && d.units && (d.savedAt||0) > (state.savedAt||0)){
+            state = JSON.parse(JSON.stringify(d));
+            try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
+            render();
+            toast('다른 기기에서 저장한 기록을 불러왔습니다.');
+          } else if((state.savedAt||0) > (d && d.savedAt || 0)) { pushCloud(); }
+          setSync('클라우드 저장됨', true);
+        } else {
+          pushCloud();
+        }
+      }).catch(function(){ clearTimeout(timer); });
+    });
+  }).catch(function(){});
+}
+
+/* ---------- 계산 ---------- */
+function num(v){ if(v === '' || v === null || v === undefined) return null; var n = Number(v); return isFinite(n) ? n : null; }
+function fmt(n, d){ if(n === null || n === undefined || !isFinite(n)) return '—'; d = d===undefined?1:d; var r = Math.round(n*Math.pow(10,d))/Math.pow(10,d); return r.toLocaleString('ko-KR',{maximumFractionDigits:d}); }
+function sgn(n){ return (n>0?'+':'') + fmt(n); }
+function diag(L, W){ return Math.sqrt(L*L + W*W); }
+/* 대각선 차이 → 뒷변 이동량: Δ ≈ 2·L·s/D  →  s = Δ·D/(2L) */
+function corr(ac, bd, L, W){
+  var D = diag(L, W), d = ac - bd;
+  return {diff:d, move: Math.abs(d) * D / (2*L), dir: d > 0 ? 'HP' : (d < 0 ? 'OP' : '')};
+}
+function esc(s){ return String(s===null||s===undefined?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+/* 직각 삼각형 3:4:5 — 설비 크기에 맞춰 자동 선택 */
+function tri(u){
+  var ks = [300,250,200,150,100,50,25], k = 25;
+  for(var i=0;i<ks.length;i++){ if(3*ks[i] <= u.W*0.95 && 4*ks[i] <= u.L*0.5){ k = ks[i]; break; } }
+  return {k:k, a:3*k, b:4*k, c:5*k};
+}
+function sizeOk(u){ return u.L > 0 && u.W > 0; }
+
+/* ---------- 작업 단계 ---------- */
+function steps(u){
+  var S = state.settings, D = diag(u.L, u.W), tr = tri(u);
+  return [
+    {key:'A', title:'시작점 A 잡기', hl:['refX','refY','X','Y','A'],
+     how:['A = 본체 외곽의 HP측·전면(포트측) 모서리. 커버 끝이 아님.',
+          '고정자: 기준선 X에 줄자 기점을 대고 "기점 OK".',
+          '측정자: 아래 눈금에 십자(+) 표시. 기준선 Y도 같은 방법.',
+          '앞 호기에서 이어 재지 말 것. 이 단계는 연필·임시 표시만.'],
+     fields:[{k:'AX', label:'A점 X (기준선 X → A)', target:u.X},
+             {k:'AY', label:'A점 Y (기준선 Y → A)', target:u.Y}]},
+    {key:'B', title:'B점 (앞 장변)', hl:['A','B','AB'],
+     how:['A에서 길이 방향으로 줄자를 펴고 아래 눈금에 B 표시.',
+          '줄자는 팽팽하게, 바닥에 붙여서.',
+          'B점의 Y값도 A와 같아야 앞 장변이 기준선과 평행.'],
+     fields:[{k:'AB', label:'A → B', target:u.L},
+             {k:'BY', label:'B점 Y (A와 같아야 함)', target:u.Y}]},
+    {key:'SQ', title:'직각 잡기 ('+tr.a+'·'+tr.b+'·'+tr.c+')', hl:['A','E','F','EF'],
+     how:['A에서 장변 방향 '+tr.b+' 지점에 E 표시.',
+          'A에서 폭 방향 약 '+tr.a+' 지점에 F를 잡는다.',
+          'E–F가 정확히 '+tr.c+'이 될 때까지 F를 좌우로 옮긴다.',
+          'A→F 방향이 폭 방향. 빗변 1mm 오차 = 폭 끝에서 약 '+fmt(u.W*tr.c/(tr.a*tr.b))+'mm 틀어짐.'],
+     fields:[{k:'EF', label:'E – F 빗변', target:tr.c, tol:1}]},
+    {key:'DC', title:'D점·C점 (뒷변)', hl:['A','B','C','D','AD','BC','DC'],
+     how:['A → F 연장선으로 폭만큼 = D.',
+          'B에서도 같은 방법으로 직각을 잡고 폭만큼 = C.',
+          'D–C 길이가 앞 장변과 같은지 확인.'],
+     fields:[{k:'AD', label:'A → D (HP측 폭)', target:u.W},
+             {k:'BC', label:'B → C (OP측 폭)', target:u.W},
+             {k:'DC', label:'D → C (뒷 장변)', target:u.L}]},
+    {key:'DG', title:'대각선 판정', hl:['AC','BD','A','B','C','D'], diag:true,
+     how:['A–C, B–D를 각각 잰다. 기준 ' + fmt(D) + ' mm.',
+          '두 값의 차이가 허용 ' + S.tolDiag + ' mm 이내면 통과.',
+          '통과하기 전에는 초크라인·확정 테이프를 치지 않는다.'],
+     fields:[{k:'AC', label:'대각선 A – C', target:D, nj:true},
+             {k:'BD', label:'대각선 B – D', target:D, nj:true}]},
+    {key:'LN', title:'확정선 치기', hl:['AB','BC','DC','AD'],
+     how:['대각선 판정 통과를 확인한 뒤에만 진행.', '4변 초크라인 → 확정색 테이프.'],
+     checks:[{k:'ln1', t:'대각선 판정 통과 확인'},{k:'ln2', t:'초크라인 4변 완료'},{k:'ln3', t:'확정색 테이프 부착'}]},
+    {key:'MD', title:'모듈 경계 P1·P2', hl:['P1','P2','A','D'],
+     how:['앞 장변: A에서 P1·P2를 각각 잰다 (P1에서 이어 재지 않음).',
+          '뒷 장변: D에서 같은 값으로 잰다.',
+          '앞뒤 두 점을 연결해 경계선. 한쪽만 찍고 직각자로 긋지 않는다.'],
+     fields:[{k:'P1F', label:'P1 앞 (A에서)', target:u.P1},{k:'P1R', label:'P1 뒤 (D에서)', target:u.P1},
+             {k:'P2F', label:'P2 앞 (A에서)', target:u.P2},{k:'P2R', label:'P2 뒤 (D에서)', target:u.P2}]},
+    {key:'PT', title:'하부 포트·지지부', hl:['ports'],
+     how:['설비 탭에 입력한 포트 위치를 A 기준으로 표시.', '호기마다 위치가 다를 수 있음 — 3대 같다고 가정하지 않는다.'],
+     note: u.ports ? ('도면값: ' + u.ports) : '설비 탭에 포트 위치가 아직 없습니다.',
+     checks:[{k:'pt1', t:'Manual Port측 포트 위치 표시'},{k:'pt2', t:'반대측 포트 위치 표시'},{k:'pt3', t:'원본 도면과 대조 완료'}]},
+    {key:'LB', title:'표기', hl:['A','arrow'],
+     how:['설비 반입 때 방향을 헷갈리지 않게 표시.'],
+     checks:[{k:'lb1', t:'호기번호 ' + u.name},{k:'lb2', t:'HP → OP 방향 화살표'},{k:'lb3', t:'A점 표시'},{k:'lb4', t:'작업일·작업자 이니셜'}]},
+    {key:'PH', title:'사진 기록', hl:[], photo:true,
+     how:['칸을 눌러 사진을 찍거나 고릅니다. 호기번호가 보이게.'],
+     slots:['전체','A점 근접 (줄자 눈금)','대각선 측정','모듈 경계']},
+    {key:'POS', phase:'pos', title:'설비 반입·위치 맞춤', hl:['AB','BC','DC','AD','A','B'],
+     how:['설비를 마킹선 안에 내려놓고, 외곽과 마킹선 사이 틈을 잰다.',
+          '값은 직접 잰 틈(mm). 설비가 선 바깥으로 나가면 +, 안쪽이면 −.',
+          'A·B 두 모서리가 맞으면 앞 장변이 평행. HP 끝은 A점선에 맞춘다.',
+          '위치가 맞기 전에는 레벨링을 시작하지 않는다.'],
+     fields:[{k:'GA', label:'A 모서리 틈 (폭 방향)', target:0, raw:true},
+             {k:'GB', label:'B 모서리 틈 (폭 방향)', target:0, raw:true},
+             {k:'GL', label:'HP 끝 ↔ A점선 (길이 방향)', target:0, raw:true}],
+     checks:[{k:'ps1', t:'HP → OP 방향이 표시와 일치'},{k:'ps2', t:'하부 포트가 표시 위치에 맞음'}]},
+    {key:'LEV', phase:'level', title:'레벨링', hl:[], level:true,
+     how:['발마다 높이를 넣으면 올리고 내릴 양과 회전수가 바로 나옵니다.']},
+    {key:'LK', phase:'level', title:'락너트·고정', hl:[],
+     how:['레벨 OK가 나온 뒤 락너트를 체결한다.', '체결하면서 레벨이 바뀔 수 있으니 한 번 더 잰다 (레벨링 단계에서 새 회차).'],
+     checks:[{k:'lk1', t:'락너트 전부 체결'},{k:'lk2', t:'체결 후 재측정 — 레벨 OK 유지'},{k:'lk3', t:'앵커·고정 (해당 시)'}]},
+    {key:'OK', phase:'done', title:'최종 완료', hl:['all'], done:true,
+     how:['라인마킹·위치·레벨링 요약에 NG가 없는지 확인하고 확인자 서명.']}
+  ];
+}
+var PHASES = [{id:'mark', t:'라인마킹'},{id:'pos', t:'위치 맞춤'},{id:'level', t:'레벨링'},{id:'done', t:'완료'}];
+function phaseOf(st){ return st.phase || 'mark'; }
+
+/* 판정 */
+function fieldResult(u, f){
+  var m = u.meas[f.k] || {};
+  var a1 = num(m.a1), a2 = num(m.a2);
+  var v = a2 !== null ? a2 : a1;
+  var tol = f.tol !== undefined ? f.tol : state.settings.tolOuter;
+  var r = {v:v, a1:a1, a2:a2, tol:tol, target:num(f.target)};
+  if(v === null){ r.st = 'empty'; return r; }
+  if(r.target === null){ r.st = 'info'; return r; }
+  r.dev = v - r.target;
+  if(f.nj){ r.st = 'info'; r.nj = true; return r; }
+  r.st = Math.abs(r.dev) <= tol + 1e-9 ? 'ok' : 'ng';
+  if(a1 !== null && a2 !== null && Math.abs(a1 - a2) > 1) r.redo = true;
+  return r;
+}
+function diagResult(u){
+  var m1 = fieldResult(u, {k:'AC', target:diag(u.L,u.W)}), m2 = fieldResult(u, {k:'BD', target:diag(u.L,u.W)});
+  if(m1.v === null || m2.v === null) return null;
+  var c = corr(m1.v, m2.v, u.L, u.W);
+  c.ok = Math.abs(c.diff) <= state.settings.tolDiag + 1e-9;
+  return c;
+}
+function levLast(u){
+  if(!u.lev) return null;
+  var r = null; u.lev.rounds.forEach(function(rd){ var x = levCalc(u, rd); if(x) r = x; });
+  return r;
+}
+function stepStatus(u, st){
+  if(st.level){ var lr = levLast(u); if(!lr) return ''; if(lr.ok) return 'ok'; return lr.count < lr.total ? 'part' : 'ng'; }
+  if(st.fields && st.checks){
+    var fs = stepStatus(u, {fields:st.fields}), cs = stepStatus(u, {checks:st.checks});
+    if(fs === 'ng') return 'ng';
+    if(fs === 'ok' && cs === 'ok') return 'ok';
+    return (fs || cs) ? 'part' : '';
+  }
+  if(st.fields){
+    var any = false, ng = false, all = true;
+    st.fields.forEach(function(f){ var r = fieldResult(u, f); if(r.st !== 'empty') any = true; else all = false; if(r.st === 'ng') ng = true; });
+    if(st.diag){ var d = diagResult(u); if(d && !d.ok) ng = true; }
+    if(ng) return 'ng';
+    if(any && all) return 'ok';
+    return any ? 'part' : '';
+  }
+  if(st.checks){
+    var n = st.checks.filter(function(c){ return u.checks[c.k]; }).length;
+    return n === st.checks.length ? 'ok' : (n ? 'part' : '');
+  }
+  if(st.photo){
+    var p = photos[u.id] || {}; var n2 = st.slots.filter(function(s,i){ return p[i]; }).length;
+    return n2 === st.slots.length ? 'ok' : (n2 ? 'part' : '');
+  }
+  if(st.done) return u.done ? 'ok' : '';
+  return '';
+}
+function unitProgress(u){
+  var ss = steps(u), ok = 0, ng = 0;
+  ss.forEach(function(s){ var t = stepStatus(u, s); if(t === 'ok') ok++; if(t === 'ng') ng++; });
+  return {ok:ok, ng:ng, total:ss.length};
+}
+
+/* ---------- 도면 그림 ---------- */
+function diagram(u, hl){
+  var H = {}; (hl||[]).forEach(function(k){ H[k] = 1; });
+  var all = H.all;
+  function on(k){ return all || H[k]; }
+  var x0 = 70, x1 = 330, y0 = 54, sc = (x1 - x0) / u.L, h = u.W * sc, y1 = y0 + h;
+  var p1 = num(u.P1), p2 = num(u.P2);
+  var xp1 = x0 + (p1 !== null ? p1 : u.L/3) * sc, xp2 = x0 + (p2 !== null ? p2 : u.L*2/3) * sc;
+  var tr = tri(u), ex = x0 + tr.b * sc, fy = y1 - tr.a * sc;
+  var gray = '#9ca3af', hc = 'var(--hl)';
+  function ln(a,b,c,d,k,dash){ var c2 = on(k) ? hc : gray, w = on(k) ? 3 : 1.4; return '<line x1="'+a+'" y1="'+b+'" x2="'+c+'" y2="'+d+'" stroke="'+c2+'" stroke-width="'+w+'"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>'; }
+  function pt(x,y,k,lab,dx,dy){ var c2 = on(k) ? hc : '#374151'; return '<circle cx="'+x+'" cy="'+y+'" r="'+(on(k)?5:3.5)+'" fill="'+c2+'"/><text x="'+(x+dx)+'" y="'+(y+dy)+'" font-size="14" font-weight="700" fill="'+c2+'">'+lab+'</text>'; }
+  var s = '<svg class="dia" viewBox="0 0 360 200" xmlns="http://www.w3.org/2000/svg">';
+  s += '<rect x="'+x0+'" y="'+y0+'" width="'+(x1-x0)+'" height="'+h+'" fill="#eff6ff" stroke="none"/>';
+  s += ln(30,16,30,194,'refX') + '<text x="34" y="26" font-size="11" fill="'+(on('refX')?hc:gray)+'">기준선 X</text>';
+  s += ln(14,180,350,180,'refY') + '<text x="346" y="174" font-size="11" text-anchor="end" fill="'+(on('refY')?hc:gray)+'">기준선 Y</text>';
+  s += ln(30,y1-24,x0,y1-24,'X','4 3') + '<text x="'+((30+x0)/2)+'" y="'+(y1-28)+'" font-size="11" text-anchor="middle" fill="'+(on('X')?hc:gray)+'">X</text>';
+  s += ln(x0-26,y1,x0-26,180,'Y','4 3') + '<text x="'+(x0-30)+'" y="'+((y1+180)/2+4)+'" font-size="11" text-anchor="end" fill="'+(on('Y')?hc:gray)+'">Y</text>';
+  s += ln(x0,y1,x1,y1,'AB') + ln(x1,y1,x1,y0,'BC') + ln(x1,y0,x0,y0,'DC') + ln(x0,y0,x0,y1,'AD');
+  s += ln(x0,y1,x1,y0,'AC','6 4') + ln(x1,y1,x0,y0,'BD','6 4');
+  s += ln(xp1,y0,xp1,y1,'P1','3 3') + ln(xp2,y0,xp2,y1,'P2','3 3');
+  s += '<text x="'+(xp1+3)+'" y="'+(y0+14)+'" font-size="11" fill="'+(on('P1')?hc:gray)+'">P1</text><text x="'+(xp2+3)+'" y="'+(y0+14)+'" font-size="11" fill="'+(on('P2')?hc:gray)+'">P2</text>';
+  if(on('EF') || on('E')){
+    s += ln(x0,y1,ex,y1,'E') + ln(x0,y1,x0,fy,'F') + ln(ex,y1,x0,fy,'EF');
+    s += pt(ex,y1,'E','E',-4,16) + pt(x0,fy,'F','F',-16,4);
+  }
+  if(on('ports')){
+    s += '<rect x="'+(x0+14)+'" y="'+y1+'" width="34" height="18" fill="none" stroke="'+hc+'" stroke-width="2"/><rect x="'+(x1-58)+'" y="'+y1+'" width="34" height="18" fill="none" stroke="'+hc+'" stroke-width="2"/>';
+  }
+  if(on('arrow')){
+    s += '<line x1="'+(x0+90)+'" y1="'+((y0+y1)/2)+'" x2="'+(x1-90)+'" y2="'+((y0+y1)/2)+'" stroke="'+hc+'" stroke-width="3"/><path d="M'+(x1-90)+' '+((y0+y1)/2-6)+' L'+(x1-78)+' '+((y0+y1)/2)+' L'+(x1-90)+' '+((y0+y1)/2+6)+'z" fill="'+hc+'"/>';
+  }
+  s += '<text x="'+(x0+6)+'" y="'+((y0+y1)/2+4)+'" font-size="11" fill="#6b7280">HP</text><text x="'+(x1-6)+'" y="'+((y0+y1)/2+4)+'" font-size="11" fill="#6b7280" text-anchor="end">OP</text>';
+  s += pt(x0,y1,'A','A',-14,16) + pt(x1,y1,'B','B',6,16) + pt(x1,y0,'C','C',6,-4) + pt(x0,y0,'D','D',-14,-4);
+  s += '<text x="'+((x0+x1)/2)+'" y="'+(y1+30)+'" font-size="12" text-anchor="middle" fill="#374151">'+fmt(u.L,0)+' × '+fmt(u.W,0)+' · 대각선 '+fmt(diag(u.L,u.W))+'</text>';
+  s += '</svg>';
+  return s;
+}
+
+/* ---------- 렌더 ---------- */
+var main = document.getElementById('main');
+function render(){
+  document.querySelectorAll('#tabs button').forEach(function(b){ b.classList.toggle('on', b.dataset.tab === state.tab); });
+  document.getElementById('stepnav').classList.toggle('hide', state.tab !== 'work');
+  if(state.cur.unit >= state.units.length) state.cur.unit = 0;
+  if(state.tab === 'work') renderWork();
+  else if(state.tab === 'est') renderEst();
+  else if(state.tab === 'setup') renderSetup();
+  else if(state.tab === 'record') renderRecord();
+  else renderCalc();
+}
+
+function unitChips(){
+  return '<div class="chips">' + state.units.map(function(u, i){
+    var p = unitProgress(u);
+    return '<button class="chip'+(i===state.cur.unit?' on':'')+(u.done?' done':'')+'" data-unit="'+i+'"><b>'+esc(u.name)+'</b><span>'+(u.done?'완료':p.ok+'/'+p.total+' 단계')+(p.ng?' · NG '+p.ng:'')+'</span></button>';
+  }).join('') + '</div>';
+}
+
+function renderWork(){
+  var u = state.units[state.cur.unit];
+  if(!u){ main.innerHTML = '<div class="card">설비 탭에서 호기를 추가하세요.</div>'; return; }
+  var ss = steps(u);
+  if(state.cur.step >= ss.length) state.cur.step = ss.length - 1;
+  var st = ss[state.cur.step], S = state.settings;
+  var h = unitChips();
+  h += sizeBar(u);
+  h += '<div class="seg" style="margin-bottom:10px">' + PHASES.map(function(ph){
+    var idx = ss.map(function(x, i){ return phaseOf(x) === ph.id ? i : -1; }).filter(function(i){ return i >= 0; });
+    var sts = idx.map(function(i){ return stepStatus(u, ss[i]); });
+    var okN = sts.filter(function(x){ return x === 'ok'; }).length, ngN = sts.filter(function(x){ return x === 'ng'; }).length;
+    var on = phaseOf(st) === ph.id;
+    return '<button data-phase="'+idx[0]+'" class="'+(on?'on':'')+'" style="font-size:14px;line-height:1.25;padding:8px 2px">'+ph.t+'<br><span style="font-size:12px;font-weight:600;'+(on?'':'color:'+(ngN?'var(--ng)':okN===idx.length?'var(--ok)':'var(--muted)'))+'">'+(ngN?'NG '+ngN:okN===idx.length?'완료':okN+'/'+idx.length)+'</span></button>';
+  }).join('') + '</div>';
+  h += '<div class="card"><div class="dots">' + ss.map(function(s, i){
+    var t = stepStatus(u, s);
+    return '<button data-step="'+i+'" class="'+(i===state.cur.step?'on ':'')+(t==='ok'?'ok':t==='ng'?'ng':'')+'">'+(i+1)+'</button>';
+  }).join('') + '</div>';
+  h += '<div class="muted">'+esc(u.name)+' · '+(state.cur.step+1)+' / '+ss.length+' 단계</div>';
+  h += '<h2>'+esc(st.title)+'</h2>';
+  h += '<div class="prog"><i style="width:'+((state.cur.step+1)/ss.length*100)+'%"></i></div>';
+  if(!st.level) h += diagram(u, st.hl);
+  h += '<ul class="how">' + st.how.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join('') + '</ul>';
+  if(st.note) h += '<div class="banner warn">'+esc(st.note)+'</div>';
+
+  if(st.fields){
+    st.fields.forEach(function(f){
+      var r = fieldResult(u, f), tgt = num(f.target), m = u.meas[f.k] || {};
+      var off = f.raw ? 0 : S.offset;
+      h += '<div class="field"><div class="top"><div><div class="lbl">'+esc(f.label)+'</div>';
+      h += '<div class="muted">기준 '+(tgt===null?'<b style="color:var(--ng)">도면값 없음</b>':fmt(tgt)+' mm')+(f.nj?'':' · 허용 ±'+fmt(r.tol))+'</div></div>';
+      if(tgt !== null && !f.raw) h += '<button class="btn sec sm" data-say="'+(Math.round((tgt+off)*10)/10)+'">읽어주기</button>';
+      h += '</div>';
+      if(tgt !== null && !f.raw) h += '<div class="tape">'+fmt(tgt+off)+'<small>줄자 눈금'+(off?' ('+off+' 기점)':'')+'</small></div>';
+      var itype = f.raw ? 'type="number" step="any" ' : '';
+      h += '<div class="inputs"><div><label>'+(f.raw?'1차 틈 (mm, 바깥 +)':'1차 읽은 눈금')+'</label><input '+itype+'inputmode="decimal" data-k="'+f.k+'" data-n="a1" value="'+(m.a1!==null&&m.a1!==undefined?(m.a1+off):'')+'"></div>';
+      h += '<div><label>2차 (역할 교대)</label><input '+itype+'inputmode="decimal" data-k="'+f.k+'" data-n="a2" value="'+(m.a2!==null&&m.a2!==undefined?(m.a2+off):'')+'"></div></div>';
+      h += '<div class="res '+resClass(r)+'" id="res-'+f.k+'">'+resText(r)+'</div></div>';
+    });
+    if(st.diag) h += '<div id="diagBox">'+diagBanner(u)+'</div>';
+  }
+  if(st.checks){
+    st.checks.forEach(function(c){
+      h += '<label class="chk"><input type="checkbox" data-chk="'+c.k+'"'+(u.checks[c.k]?' checked':'')+'><span>'+esc(c.t)+'</span></label>';
+    });
+  }
+  if(st.level) h += levelPanel(u);
+  if(st.photo){
+    var p = photos[u.id] || {};
+    h += '<div class="photos">' + st.slots.map(function(sl, i){
+      return '<label class="ph">'+(p[i]?'<img src="'+p[i]+'" alt=""><span class="cap">'+esc(sl)+'</span>':'<b>+</b><span>'+esc(sl)+'</span>')+'<input type="file" accept="image/*" capture="environment" data-photo="'+i+'"></label>';
+    }).join('') + '</div><div class="muted" style="margin-top:6px">사진은 이 휴대폰에만 저장됩니다.</div>';
+  }
+  if(st.done){
+    h += '<h3>라인마킹·위치</h3>' + summaryTable(u);
+    h += '<h3>레벨링</h3>' + levSummary(u);
+    h += '<div class="grid2" style="margin-top:10px"><div><label>작업자</label><input data-u="worker" value="'+esc(u.worker||S.worker||'')+'"></div><div><label>확인자</label><input data-u="checker" value="'+esc(u.checker||'')+'"></div></div>';
+    var pr = unitProgress(u);
+    if(u.done) h += '<div class="banner ok">'+esc(u.name)+' 완료 · '+esc(u.done)+'</div><button class="btn sec" style="width:100%;margin-top:8px" id="undoDone">완료 취소</button>';
+    else h += (pr.ng?'<div class="banner ng">NG 단계가 '+pr.ng+'개 있습니다. 해결 후 완료하세요.</div>':'') + (pr.ok < pr.total-1 ? '<div class="banner warn">아직 끝나지 않은 단계: '+ss.filter(function(x){ return !x.done && stepStatus(u,x) !== 'ok'; }).map(function(x){ return x.title; }).join(', ')+'</div>' : '') + '<button class="btn ok" style="width:100%;margin-top:10px" id="markDone">'+esc(u.name)+' 완료 처리</button>';
+  }
+  h += '</div>';
+  main.innerHTML = h;
+  document.getElementById('prevBtn').disabled = state.cur.step === 0;
+  var nb = document.getElementById('nextBtn');
+  if(state.cur.step === ss.length - 1){
+    var nextU = state.cur.unit + 1 < state.units.length ? state.units[state.cur.unit+1] : null;
+    nb.textContent = nextU ? nextU.name + ' 시작' : '기록 보기';
+  } else nb.textContent = '다음';
+}
+
+var sizeOpen = false;
+function sizeBar(u){
+  var P = state.settings.presets || [];
+  var h = '<div class="card" style="padding:10px 14px"><div class="row" style="justify-content:space-between"><div><div class="muted">'+esc(u.name)+' 외곽 크기</div><b style="font-size:20px">'+fmt(u.L,0)+' × '+fmt(u.W,0)+' mm</b> <span class="muted">대각선 '+fmt(diag(u.L,u.W))+'</span></div>'
+    + '<button class="btn sec sm" id="sizeToggle">'+(sizeOpen?'닫기':'크기 변경')+'</button></div>';
+  if(sizeOpen){
+    h += '<div class="grid2" style="margin-top:10px"><div><label>가로 (길이 L, mm)</label><input inputmode="decimal" data-sz="L" value="'+u.L+'"></div><div><label>세로 (폭 W, mm)</label><input inputmode="decimal" data-sz="W" value="'+u.W+'"></div></div>';
+    if(P.length) h += '<div class="muted" style="margin-top:10px">저장된 크기</div><div class="rounds">' + P.map(function(p, i){ return '<button data-preset="'+i+'" class="'+(p.L===u.L&&p.W===u.W?'on':'')+'">'+esc(p.name)+' '+fmt(p.L,0)+'×'+fmt(p.W,0)+'</button>'; }).join('') + '</div>';
+    h += '<div class="row" style="margin-top:10px"><input id="presetName" placeholder="크기 이름 (예: N2 Stocker)" style="flex:1;min-width:140px;padding:10px;border:1px solid var(--line);border-radius:10px;font-size:16px"><button class="btn sec sm" id="presetSave">현재 크기 저장</button></div>';
+    h += '<button class="btn sm" style="width:100%;margin-top:8px" id="sizeAll">이 크기를 모든 호기에 적용</button>';
+    var bad = ['P1','P2'].filter(function(k){ var v = num(u[k]); return v !== null && v >= u.L; });
+    if(bad.length) h += '<div class="banner warn">'+bad.join('·')+' 값이 길이보다 큽니다. 설비 탭에서 확인하세요.</div>';
+    h += '<div class="muted" style="margin-top:6px">크기를 바꾸면 기준값·대각선·직각 삼각형·그림이 바로 바뀝니다. 이미 입력한 실측값은 새 기준으로 다시 판정됩니다.</div>';
+  }
+  return h + '</div>';
+}
+function setSize(u, k, v){
+  var n = num(v);
+  if(n === null || n <= 0){ toast('0보다 큰 숫자를 넣으세요'); return false; }
+  u[k] = n; return true;
+}
+
+function resClass(r){ return r.st === 'empty' ? 'info' : r.st === 'info' ? 'info' : (r.redo ? 'warn' : r.st); }
+function resText(r){
+  if(r.st === 'empty') return '읽은 눈금을 입력하세요';
+  var s = '실제 ' + fmt(r.v) + ' mm';
+  if(r.nj) return s + ' · 기준 대비 ' + sgn(r.dev) + ' · 판정은 두 대각선 차이로 (아래)';
+  if(r.st === 'info') return s + ' · 기준값 없음 (설비 탭에서 입력)';
+  s += ' · 편차 ' + sgn(r.dev) + ' · ' + (r.st === 'ok' ? 'OK' : 'NG — 다시 확인');
+  if(r.redo) s += ' · 1·2차 차이 ' + fmt(Math.abs(r.a1 - r.a2)) + ' mm → 3차 측정';
+  return s;
+}
+function diagBanner(u){
+  var d = diagResult(u);
+  if(!d) return '<div class="banner warn">두 대각선을 모두 입력하면 판정합니다.</div>';
+  var sideNg = ['AB','AD','BC','DC'].some(function(k){
+    var t = (k==='AB'||k==='DC') ? u.L : u.W; return fieldResult(u,{k:k,target:t}).st === 'ng';
+  });
+  if(d.ok) return '<div class="banner ok">통과 — 대각선 차이 '+fmt(Math.abs(d.diff))+' mm (허용 '+state.settings.tolDiag+'). 확정선을 쳐도 됩니다.</div>';
+  var s = '<div class="banner ng">불합격 — 대각선 차이 '+fmt(Math.abs(d.diff))+' mm<br>';
+  if(sideNg) s += '먼저 NG인 변 길이부터 바로잡으세요 (D·C 단계).';
+  else s += '앞 장변 A–B는 그대로 두고, 뒷변 D·C를 <u>'+d.dir+' 쪽으로 약 '+fmt(d.move)+' mm</u> 옮긴 뒤 다시 재세요.';
+  return s + '</div>';
+}
+function summaryTable(u){
+  var ss = steps(u), rows = '';
+  ss.forEach(function(st){
+    (st.fields||[]).forEach(function(f){
+      var r = fieldResult(u, f);
+      rows += '<tr><td>'+esc(f.label)+'</td><td>'+fmt(num(f.target))+'</td><td>'+fmt(r.v)+'</td><td>'+(r.dev!==undefined?sgn(r.dev):'—')+'</td><td class="'+(r.st==='ok'?'ok':r.st==='ng'?'ng':'')+'">'+(r.st==='ok'?'OK':r.st==='ng'?'NG':r.st==='info'?'기록':'—')+'</td></tr>';
+    });
+  });
+  var d = diagResult(u);
+  rows += '<tr><td>대각선 차이</td><td>≤'+state.settings.tolDiag+'</td><td>'+(d?fmt(Math.abs(d.diff)):'—')+'</td><td></td><td class="'+(d?(d.ok?'ok':'ng'):'')+'">'+(d?(d.ok?'OK':'NG'):'—')+'</td></tr>';
+  return '<table><tr><th>항목</th><th>기준</th><th>실측</th><th>편차</th><th>판정</th></tr>'+rows+'</table>';
+}
+
+function renderSetup(){
+  var S = state.settings;
+  var h = '<div class="card"><h2>공통 설정</h2>';
+  h += '<div class="f"><label>줄자 기점 (후크 대신 100 눈금에 맞추면 오차가 줄어요)</label><div class="seg"><button data-off="0" class="'+(S.offset===0?'on':'')+'">0 (후크)</button><button data-off="100" class="'+(S.offset===100?'on':'')+'">100 기점</button></div></div>';
+  h += '<div class="grid2 f"><div><label>외곽 허용 ± mm</label><input inputmode="decimal" data-s="tolOuter" value="'+S.tolOuter+'"></div><div><label>대각선 차 허용 mm</label><input inputmode="decimal" data-s="tolDiag" value="'+S.tolDiag+'"></div></div>';
+  h += '<div class="muted" style="margin-top:4px">허용값은 기본값입니다. 도면·고객사 기준으로 바꾸세요.</div>';
+  h += '<div class="f"><label>작업자 이름</label><input data-s="worker" value="'+esc(S.worker)+'"></div></div>';
+  state.units.forEach(function(u, i){
+    h += '<div class="card"><div class="row" style="justify-content:space-between"><h2>'+esc(u.name)+'</h2><button class="btn sec sm" data-del="'+i+'">삭제</button></div>';
+    h += '<div class="grid2">';
+    h += fi(i,'name','호기','text') + fi(i,'sched','일정','text');
+    h += fi(i,'L','가로 = 길이 L (mm)') + fi(i,'W','세로 = 폭 W (mm)');
+    h += fi(i,'X','X값: 기준선 X → A') + fi(i,'Y','Y값: 기준선 Y → A');
+    h += fi(i,'P1','P1 (A에서 mm)') + fi(i,'P2','P2 (A에서 mm)');
+    h += '</div><div class="f"><label>하부 포트 위치 메모 (A 기준)</label><textarea rows="2" data-ui="'+i+'" data-uk="ports">'+esc(u.ports)+'</textarea></div>';
+    h += '<div class="muted" style="margin-top:6px">대각선 기준: '+fmt(diag(u.L,u.W))+' mm</div></div>';
+  });
+  h += '<button class="btn" style="width:100%" id="addUnit">호기 추가</button>';
+  h += '<button class="btn sec" style="width:100%;margin-top:10px" id="resetAll">실측 기록 모두 지우기</button>';
+  main.innerHTML = h;
+}
+function fi(i, k, label, type){
+  var u = state.units[i], v = u[k];
+  return '<div><label>'+label+'</label><input '+(type==='text'?'':'inputmode="decimal" ')+'data-ui="'+i+'" data-uk="'+k+'" value="'+(v===null||v===undefined?'':esc(v))+'"'+(type!=='text'&&(v===null||v===undefined||v==='')?' placeholder="도면값"':'')+'></div>';
+}
+
+function renderRecord(){
+  var h = '<div class="card"><h2>실측 기록</h2><div class="muted">기준 · 실측(2차가 있으면 2차) · 편차 · 판정</div><div class="row" style="margin-top:10px"><button class="btn sm" id="csvBtn">CSV 파일 저장</button><button class="btn sec sm" id="copyBtn">텍스트 복사</button></div></div>';
+  state.units.forEach(function(u){
+    var p = unitProgress(u), ph = photos[u.id] || {};
+    h += '<div class="card"><h2>'+esc(u.name)+' <span class="muted">'+esc(u.sched)+'</span></h2>';
+    h += '<div class="muted">'+(u.done?'완료 '+esc(u.done):'진행 '+p.ok+'/'+p.total)+(u.worker?' · 작업 '+esc(u.worker):'')+(u.checker?' · 확인 '+esc(u.checker):'')+'</div>';
+    h += summaryTable(u);
+    h += '<h3>레벨링</h3>' + levSummary(u);
+    var keys = Object.keys(ph);
+    if(keys.length) h += '<div class="photos">'+keys.map(function(k){ return '<div class="ph"><img src="'+ph[k]+'" alt=""></div>'; }).join('')+'</div><button class="btn sec sm" style="margin-top:8px" data-clearph="'+u.id+'">이 호기 사진 지우기</button>';
+    h += '</div>';
+  });
+  main.innerHTML = h;
+}
+
+function curU(){ return state.units[state.cur.unit] || {L:7430, W:1462}; }
+function renderCalc(){
+  var h = '';
+  h += '<div class="card calc"><h2>대각선 계산</h2><div class="grid2"><div><label>길이 mm</label><input inputmode="decimal" id="cL" value="'+curU().L+'"></div><div><label>폭 mm</label><input inputmode="decimal" id="cW" value="'+curU().W+'"></div></div><div class="out" id="cD"></div><div class="muted">√(길이² + 폭²)</div></div>';
+  h += '<div class="card calc"><h2>대각선 보정량</h2><div class="grid2"><div><label>A–C 실측</label><input inputmode="decimal" id="kAC" placeholder="예: 7576"></div><div><label>B–D 실측</label><input inputmode="decimal" id="kBD" placeholder="예: 7569"></div><div><label>길이 mm</label><input inputmode="decimal" id="kL" value="'+curU().L+'"></div><div><label>폭 mm</label><input inputmode="decimal" id="kW" value="'+curU().W+'"></div></div><div class="out" id="kOut" style="font-size:18px"></div></div>';
+  h += '<div class="card calc"><h2>직각 삼각형 (3:4:5)</h2><div class="f"><label>배수 k (300 → 900·1200·1500)</label><input inputmode="decimal" id="tK" value="'+tri(curU()).k+'"></div><div class="out" id="tOut" style="font-size:20px"></div></div>';
+  h += '<div class="card calc"><h2>줄자 기점 변환</h2><div class="grid2"><div><label>실제 거리 mm</label><input inputmode="decimal" id="oR" value="'+curU().L+'"></div><div><label>기점 mm</label><input inputmode="decimal" id="oO" value="'+state.settings.offset+'"></div></div><div class="out" id="oOut"></div></div>';
+  main.innerHTML = h;
+  calcAll();
+}
+function v(id){ var e = document.getElementById(id); return e ? num(e.value) : null; }
+function calcAll(){
+  var L = v('cL'), W = v('cW');
+  document.getElementById('cD').textContent = (L&&W) ? fmt(diag(L,W),2) + ' mm' : '—';
+  var ac = v('kAC'), bd = v('kBD'), kL = v('kL'), kW = v('kW'), ko = document.getElementById('kOut');
+  if(ac!==null && bd!==null && kL && kW){
+    var c = corr(ac, bd, kL, kW);
+    ko.innerHTML = c.diff === 0 ? '차이 0 — 직각입니다.' : '차이 '+fmt(Math.abs(c.diff))+' mm → 뒷변 D·C를 <b>'+c.dir+' 쪽으로 '+fmt(c.move)+' mm</b> 이동' + (Math.abs(c.diff) <= state.settings.tolDiag ? '<br><span class="muted">허용 '+state.settings.tolDiag+' mm 이내라 보정 불필요</span>' : '');
+  } else ko.textContent = '두 대각선을 입력하세요';
+  var k = v('tK'), t = document.getElementById('tOut');
+  t.innerHTML = k ? fmt(3*k,0)+' · '+fmt(4*k,0)+' · <b>'+fmt(5*k,0)+'</b> (빗변)<br><span class="muted">빗변 1 mm 오차 = 직각에서 약 '+fmt(5*k/(3*k*4*k)*1000,2)+' mm/m 틀어짐</span>' : '—';
+  var r = v('oR'), o = v('oO');
+  document.getElementById('oOut').textContent = (r!==null&&o!==null) ? '줄자 눈금 ' + fmt(r+o) : '—';
+}
+
+/* ---------- 레벨링 ---------- */
+function ensureLev(u){
+  if(!u.lev) u.lev = {n:4, xs:'', pitch:2.5, ref:'max', setH:null, kind:'h', tolFlat:0.5, tolTilt:0.1, rounds:[{at:'', v:{}}], ri:0, checks:{}};
+  if(!u.lev.rounds || !u.lev.rounds.length) u.lev.rounds = [{at:'', v:{}}];
+  if(u.lev.ri >= u.lev.rounds.length) u.lev.ri = u.lev.rounds.length - 1;
+  if(!u.lev.checks) u.lev.checks = {};
+  return u.lev;
+}
+function levX(u){
+  var L = ensureLev(u), n = L.n;
+  var xs = String(L.xs||'').split(/[,\s]+/).map(num).filter(function(x){ return x !== null; });
+  if(xs.length === n) return xs;
+  var a = []; for(var i=0;i<n;i++) a.push(n === 1 ? u.L/2 : u.L*i/(n-1));
+  return a;
+}
+function levKeys(u){ var n = ensureLev(u).n, k = []; for(var i=0;i<n;i++){ k.push('F'+i); k.push('R'+i); } return k; }
+function footName(k){ return (k[0]==='F'?'앞':'뒤') + (+k.slice(1)+1); }
+function levCalc(u, round){
+  var L = ensureLev(u), xs = levX(u), pts = [];
+  for(var i=0;i<L.n;i++){
+    ['F','R'].forEach(function(sd){
+      var v = num(round.v[sd+i]);
+      if(v !== null) pts.push({k:sd+i, x:xs[i], y: sd==='F'?0:u.W, h: L.kind==='h' ? v : -v});
+    });
+  }
+  if(!pts.length) return null;
+  var hs = pts.map(function(p){ return p.h; });
+  var mx = Math.max.apply(null, hs), mn = Math.min.apply(null, hs), avg = hs.reduce(function(a,b){return a+b;},0)/hs.length;
+  var T = L.ref === 'avg' ? avg : L.ref === 'set' && num(L.setH) !== null ? (L.kind==='h' ? num(L.setH) : -num(L.setH)) : mx;
+  var adj = {}; pts.forEach(function(p){ adj[p.k] = T - p.h; });
+  var r = {pts:pts, T:T, adj:adj, flat:mx-mn, count:pts.length, total:L.n*2};
+  /* 최소제곱 평면 h = a + b·x + c·y  →  기울기 b, c (mm/mm) */
+  if(pts.length >= 3){
+    var S = [[0,0,0],[0,0,0],[0,0,0]], B = [0,0,0];
+    pts.forEach(function(p){ var row = [1, p.x, p.y]; for(var i=0;i<3;i++){ for(var j=0;j<3;j++) S[i][j] += row[i]*row[j]; B[i] += row[i]*p.h; } });
+    var det = function(M){ return M[0][0]*(M[1][1]*M[2][2]-M[1][2]*M[2][1]) - M[0][1]*(M[1][0]*M[2][2]-M[1][2]*M[2][0]) + M[0][2]*(M[1][0]*M[2][1]-M[1][1]*M[2][0]); };
+    var d = det(S);
+    if(Math.abs(d) > 1e-6){
+      var col = function(c){ return S.map(function(row, i){ return row.map(function(v, j){ return j===c ? B[i] : v; }); }); };
+      r.tx = det(col(1))/d*1000; r.ty = det(col(2))/d*1000;
+    }
+  }
+  r.flatOk = r.flat <= L.tolFlat + 1e-9;
+  r.tiltOk = r.tx === undefined ? null : (Math.abs(r.tx) <= L.tolTilt + 1e-9 && Math.abs(r.ty) <= L.tolTilt + 1e-9);
+  r.ok = r.count === r.total && r.flatOk && r.tiltOk !== false;
+  return r;
+}
+function turnsText(a, pitch){
+  if(!pitch) return '';
+  var t = Math.abs(a)/pitch;
+  return fmt(t,2)+'회전 (≈'+Math.round(t*360)+'°)';
+}
+function adjCls(a, tol){ return Math.abs(a) <= Math.max(0.005, tol*0.1) ? 'z' : (a > 0 ? 'up' : 'dn'); }
+function adjText(a, L){
+  if(Math.abs(a) <= Math.max(0.005, L.tolFlat*0.1)) return '맞음';
+  return (a>0?'↑ ':'↓ ') + fmt(Math.abs(a),2) + ' · ' + turnsText(a, L.pitch);
+}
+function levelDiagram(u, res){
+  var L = ensureLev(u), xs = levX(u);
+  var x0 = 40, x1 = 320, y0 = 46, y1 = 126, sc = (x1-x0)/u.L;
+  var s = '<svg class="dia" viewBox="0 0 360 180" xmlns="http://www.w3.org/2000/svg">';
+  s += '<rect x="'+x0+'" y="'+y0+'" width="'+(x1-x0)+'" height="'+(y1-y0)+'" fill="#eff6ff" stroke="#1d4ed8" stroke-width="1.5"/>';
+  s += '<text x="'+(x0+4)+'" y="'+((y0+y1)/2+4)+'" font-size="11" fill="#6b7280">HP</text><text x="'+(x1-4)+'" y="'+((y0+y1)/2+4)+'" font-size="11" fill="#6b7280" text-anchor="end">OP</text>';
+  s += '<text x="'+((x0+x1)/2)+'" y="'+(y0-28)+'" font-size="11" text-anchor="middle" fill="#6b7280">뒤 (D – C)</text><text x="'+((x0+x1)/2)+'" y="'+(y1+44)+'" font-size="11" text-anchor="middle" fill="#6b7280">앞 (A – B, 포트측)</text>';
+  for(var i=0;i<L.n;i++){
+    ['R','F'].forEach(function(sd){
+      var k = sd+i, cx = x0 + xs[i]*sc, cy = sd==='F' ? y1 : y0;
+      var a = res && res.adj[k] !== undefined ? res.adj[k] : null;
+      var col = a === null ? '#d1d5db' : Math.abs(a) <= L.tolFlat/2 ? '#16a34a' : Math.abs(a) <= L.tolFlat ? '#d97706' : '#dc2626';
+      s += '<circle cx="'+cx+'" cy="'+cy+'" r="9" fill="'+col+'" stroke="#fff" stroke-width="2"/>';
+      s += '<text x="'+cx+'" y="'+(cy+4)+'" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">'+(i+1)+'</text>';
+      if(a !== null) s += '<text x="'+cx+'" y="'+(sd==='F'? cy+24 : cy-14)+'" font-size="11" font-weight="700" text-anchor="middle" fill="'+(Math.abs(a)<=Math.max(0.005,L.tolFlat*0.1)?'#15803d':a>0?'#1d4ed8':'#b45309')+'">'+(Math.abs(a)<=Math.max(0.005,L.tolFlat*0.1)?'OK':(a>0?'↑':'↓')+fmt(Math.abs(a),2))+'</text>';
+    });
+  }
+  return s + '</svg>';
+}
+function levelOrder(u, res){
+  var L = ensureLev(u), n = L.n, thr = Math.max(0.005, L.tolFlat*0.1);
+  var corners = ['F0','F'+(n-1),'R0','R'+(n-1)].filter(function(k, i, a){ return a.indexOf(k) === i; });
+  var need = function(k){ return res.adj[k] !== undefined && Math.abs(res.adj[k]) > thr; };
+  var byAbs = function(a, b){ return Math.abs(res.adj[b]) - Math.abs(res.adj[a]); };
+  var c = corners.filter(need).sort(byAbs), m = levKeys(u).filter(function(k){ return corners.indexOf(k) < 0 && need(k); }).sort(byAbs);
+  var item = function(k){ return '<li><b>'+footName(k)+'</b> '+adjText(res.adj[k], L)+'</li>'; };
+  if(!c.length && !m.length) return '<div class="banner ok">조정할 발이 없습니다. 락너트 체결 후 재측정하세요.</div>';
+  var h = '';
+  if(c.length) h += '<h3>① 네 모서리부터 (큰 순서)</h3><ol class="order">'+c.map(item).join('')+'</ol>';
+  if(m.length) h += '<h3>② 가운데 발 (하중이 고르게 실릴 만큼)</h3><ol class="order">'+m.map(item).join('')+'</ol>';
+  return h + '<div class="muted">③ 조정 후 레이저·수준기를 옮기지 말고 같은 위치에서 다음 회차를 잽니다.</div>';
+}
+function tiltText(res){
+  if(res.tx === undefined) return '';
+  var a = Math.abs(res.tx) < 0.0005 ? '길이 방향 수평' : (res.tx > 0 ? 'OP 쪽이 ' : 'HP 쪽이 ') + fmt(Math.abs(res.tx),3) + ' mm/m 높음';
+  var b = Math.abs(res.ty) < 0.0005 ? '폭 방향 수평' : (res.ty > 0 ? '뒤(D–C)가 ' : '앞(A–B)이 ') + fmt(Math.abs(res.ty),3) + ' mm/m 높음';
+  return a + ' · ' + b;
+}
+
+function levelPanel(u){
+  var L = ensureLev(u), round = L.rounds[L.ri], res = levCalc(u, round);
+  var h = '<details style="margin-top:6px"><summary class="muted" style="font-weight:700">레벨링 순서 보기</summary><ol class="order">'
+    + '<li>설비가 마킹선(외곽·A점)에 맞게 놓였는지 먼저 확인.</li>'
+    + '<li>모든 발이 바닥에 닿게 하고, 레이저 레벨(또는 정밀 수준기)을 설비 옆 한 곳에 고정.</li>'
+    + '<li>각 발 위치의 높이(또는 수신기 눈금)를 앞1부터 차례로 입력.</li>'
+    + '<li>네 모서리부터 크게 틀린 순서로 조정 → 가운데 발은 하중이 고르게 실릴 만큼.</li>'
+    + '<li>"새 회차"로 다시 측정. 판정 OK가 나올 때까지 반복.</li>'
+    + '<li>락너트 체결 → 체결 후 한 번 더 측정해 변하지 않았는지 확인.</li></ol></details>';
+
+  h += '<div class="f"><label>측정값 종류</label><div class="seg"><button data-lvkind="h" class="'+(L.kind==='h'?'on':'')+'">높이 (클수록 높음)</button><button data-lvkind="r" class="'+(L.kind==='r'?'on':'')+'">수신기·스태프 눈금 (클수록 낮음)</button></div></div>';
+  h += '<div class="f"><label>목표 높이 기준</label><div class="seg"><button data-lvref="max" class="'+(L.ref==='max'?'on':'')+'">가장 높은 발</button><button data-lvref="avg" class="'+(L.ref==='avg'?'on':'')+'">평균</button><button data-lvref="set" class="'+(L.ref==='set'?'on':'')+'">지정값</button></div></div>';
+  if(L.ref === 'set') h += '<div class="f"><label>목표값 (측정값과 같은 단위, mm)</label><input type="number" step="any" data-lv="setH" value="'+(L.setH===null?'':L.setH)+'"></div>';
+  h += '<div class="muted" style="margin-top:6px">가장 높은 발 기준 = 나머지 발은 올리기만 하면 됩니다.</div>';
+
+  h += '<div class="rounds">' + L.rounds.map(function(r, i){ return '<button data-lvround="'+i+'" class="'+(i===L.ri?'on':'')+'">'+(i+1)+'회차</button>'; }).join('') + '<button data-lvnew="1">+ 새 회차</button></div>';
+
+  h += levelDiagram(u, res);
+  h += '<div class="lvgrid"><div></div><div class="hd">뒤 (D–C)</div><div class="hd">앞 (A–B)</div>';
+  for(var i=0;i<L.n;i++){
+    h += '<div class="no">'+(i+1)+'</div>';
+    ['R','F'].forEach(function(sd){
+      var k = sd+i, v = round.v[k], a = res && res.adj[k] !== undefined ? res.adj[k] : null;
+      h += '<div><input type="number" step="any" inputmode="decimal" data-lk="'+k+'" value="'+(v===null||v===undefined?'':v)+'"><div class="adj '+(a===null?'':adjCls(a, L.tolFlat))+'" id="adj-'+k+'">'+(a===null?'':adjText(a, L))+'</div></div>';
+    });
+  }
+  h += '</div><div id="lvResult">' + levResultHtml(u, res) + '</div>';
+
+  h += '<h3>회차별 결과</h3><div id="lvRounds">'+roundsTable(u)+'</div><div class="muted" style="margin-top:6px">평탄도 = 가장 높은 발 − 가장 낮은 발 (mm). 기울기 단위 mm/m.</div>';
+
+  h += '<details style="margin-top:12px"'+(L.cfgOpen?' open':'')+'><summary style="font-weight:700">레벨링 설정 (발 개수·위치·피치·허용값)</summary><div class="grid2" style="margin-top:8px">';
+  h += '<div><label>한쪽 발 개수</label><input type="number" min="2" max="12" data-lv="n" value="'+L.n+'"></div>';
+  h += '<div><label>볼트 피치 mm/회전</label><input type="number" step="any" data-lv="pitch" value="'+L.pitch+'"></div>';
+  h += '<div><label>평탄도 허용 mm</label><input type="number" step="any" data-lv="tolFlat" value="'+L.tolFlat+'"></div>';
+  h += '<div><label>기울기 허용 mm/m</label><input type="number" step="any" data-lv="tolTilt" value="'+L.tolTilt+'"></div>';
+  h += '</div><div class="f"><label>발 위치 (A에서 mm, 쉼표로 '+L.n+'개 · 비우면 균등)</label><input data-lv="xs" value="'+esc(L.xs)+'" placeholder="'+levX(u).map(function(x){return Math.round(x);}).join(', ')+'"></div>';
+  h += '<div class="muted" style="margin-top:6px">피치 예: M16 = 2, M20 = 2.5, M24 = 3. 허용값은 임시 기본값이니 설비 사양으로 바꾸세요.</div></details>';
+  return h;
+}
+function levSummary(u){
+  var last = levLast(u);
+  if(!last) return '<div class="muted">레벨링 기록 없음</div>';
+  var n = u.lev.rounds.filter(function(r){ return levCalc(u, r); }).length;
+  return '<table><tr><th>회차</th><th>평탄도</th><th>길이 mm/m</th><th>폭 mm/m</th><th>판정</th></tr><tr><td>'+n+'회</td><td>'+fmt(last.flat,2)+'</td><td>'+(last.tx===undefined?'—':fmt(last.tx,3))+'</td><td>'+(last.ty===undefined?'—':fmt(last.ty,3))+'</td><td class="'+(last.ok?'ok':'ng')+'">'+(last.ok?'OK':'NG')+'</td></tr></table>'
+    + '<div class="muted">락너트 체결 '+(u.checks.lk1?'✓':'—')+' · 체결 후 재측정 '+(u.checks.lk2?'✓':'—')+'</div>';
+}
+function roundsTable(u){
+  var L = ensureLev(u), h = '<table><tr><th>회차</th><th>측정</th><th>평탄도</th><th>길이</th><th>폭</th><th>판정</th></tr>';
+  L.rounds.forEach(function(r, i){
+    var x = levCalc(u, r);
+    h += '<tr><td>'+(i+1)+'</td><td>'+(x?x.count+'/'+x.total:'—')+'</td><td>'+(x?fmt(x.flat,2):'—')+'</td><td>'+(x&&x.tx!==undefined?fmt(x.tx,3):'—')+'</td><td>'+(x&&x.ty!==undefined?fmt(x.ty,3):'—')+'</td><td class="'+(x?(x.ok?'ok':'ng'):'')+'">'+(x?(x.ok?'OK':(x.count<x.total?'측정중':'NG')):'—')+'</td></tr>';
+  });
+  return h + '</table>';
+}
+function levResultHtml(u, res){
+  var L = ensureLev(u);
+  if(!res) return '<div class="banner warn">발 높이를 입력하면 조정량을 계산합니다.</div>';
+  var h = '<div class="kpi"><div class="'+(res.flatOk?'ok':'ng')+'"><b>'+fmt(res.flat,2)+'</b><span>평탄도 mm (≤'+L.tolFlat+')</span></div>';
+  h += '<div class="'+(res.tx===undefined?'':Math.abs(res.tx)<=L.tolTilt?'ok':'ng')+'"><b>'+(res.tx===undefined?'—':fmt(res.tx,3))+'</b><span>길이 기울기 mm/m</span></div>';
+  h += '<div class="'+(res.ty===undefined?'':Math.abs(res.ty)<=L.tolTilt?'ok':'ng')+'"><b>'+(res.ty===undefined?'—':fmt(res.ty,3))+'</b><span>폭 기울기 mm/m</span></div></div>';
+  if(res.tx !== undefined) h += '<div class="muted" style="margin-top:6px">'+tiltText(res)+'</div>';
+  if(res.count < res.total) h += '<div class="banner warn">'+res.count+'/'+res.total+'개 측정됨 — 나머지 발도 입력하세요.</div>';
+  else if(res.ok) h += '<div class="banner ok">레벨 OK — 락너트 체결 후 한 번 더 측정하세요.</div>';
+  else h += '<div class="banner ng">기준 밖 — 아래 순서로 조정 후 새 회차로 다시 재세요.</div>';
+  if(res.count === res.total && !res.ok) h += levelOrder(u, res);
+  return h;
+}
+function refreshLevel(u){
+  var L = ensureLev(u), res = levCalc(u, L.rounds[L.ri]);
+  levKeys(u).forEach(function(k){
+    var el = document.getElementById('adj-'+k); if(!el) return;
+    var a = res && res.adj[k] !== undefined ? res.adj[k] : null;
+    el.className = 'adj ' + (a===null?'':adjCls(a, L.tolFlat)); el.textContent = a===null ? '' : adjText(a, L);
+  });
+  var svg = document.querySelector('#main svg.dia'); if(svg) svg.outerHTML = levelDiagram(u, res);
+  document.getElementById('lvResult').innerHTML = levResultHtml(u, res);
+  var rt = document.getElementById('lvRounds'); if(rt) rt.innerHTML = roundsTable(u);
+}
+
+/* ---------- 이벤트 ---------- */
+document.getElementById('tabs').addEventListener('click', function(e){
+  var b = e.target.closest('button'); if(!b) return;
+  state.tab = b.dataset.tab; save(); render(); window.scrollTo(0,0);
+});
+document.getElementById('prevBtn').addEventListener('click', function(){ if(state.cur.step>0){ state.cur.step--; save(); render(); window.scrollTo(0,0);} });
+document.getElementById('nextBtn').addEventListener('click', function(){
+  var u = state.units[state.cur.unit], n = steps(u).length;
+  if(state.cur.step < n-1) state.cur.step++;
+  else if(state.cur.unit + 1 < state.units.length){ state.cur.unit++; state.cur.step = 0; }
+  else state.tab = 'record';
+  save(); render(); window.scrollTo(0,0);
+});
+
+main.addEventListener('click', function(e){
+  var t = e.target.closest('[data-phase],#sizeToggle,#presetSave,#sizeAll,[data-preset],[data-unit],[data-step],[data-say],[data-off],[data-del],[data-clearph],[data-lvkind],[data-lvref],[data-lvround],[data-lvnew],#markDone,#undoDone,#addUnit,#resetAll,#csvBtn,#copyBtn');
+  if(!t) return;
+  if(t.dataset.phase !== undefined){ state.cur.step = +t.dataset.phase; save(); render(); window.scrollTo(0,0); return; }
+  if(t.id === 'sizeToggle'){ sizeOpen = !sizeOpen; render(); return; }
+  if(t.dataset.preset !== undefined){ var pr = state.settings.presets[+t.dataset.preset], cu = state.units[state.cur.unit]; cu.L = pr.L; cu.W = pr.W; save(); render(); toast(cu.name+' → '+pr.name); return; }
+  if(t.id === 'presetSave'){
+    var cu2 = state.units[state.cur.unit], nm = (document.getElementById('presetName').value || '').trim() || (fmt(cu2.L,0)+'×'+fmt(cu2.W,0));
+    var PS = state.settings.presets || (state.settings.presets = []);
+    var ex = PS.filter(function(p){ return p.name === nm; })[0];
+    if(ex){ ex.L = cu2.L; ex.W = cu2.W; } else PS.push({name:nm, L:cu2.L, W:cu2.W});
+    save(); render(); toast('크기 저장: '+nm); return;
+  }
+  if(t.id === 'sizeAll'){ var cu3 = state.units[state.cur.unit]; confirmBox('모든 호기를 '+fmt(cu3.L,0)+' × '+fmt(cu3.W,0)+' mm로 바꿀까요?', function(){ state.units.forEach(function(x){ x.L = cu3.L; x.W = cu3.W; }); save(); render(); toast('모든 호기에 적용'); }); return; }
+  if(t.dataset.lvkind || t.dataset.lvref || t.dataset.lvround !== undefined || t.dataset.lvnew){
+    var LL = ensureLev(state.units[state.cur.unit]);
+    if(t.dataset.lvkind) LL.kind = t.dataset.lvkind;
+    if(t.dataset.lvref) LL.ref = t.dataset.lvref;
+    if(t.dataset.lvround !== undefined) LL.ri = +t.dataset.lvround;
+    if(t.dataset.lvnew){ LL.rounds.push({at:'', v:{}}); LL.ri = LL.rounds.length - 1; toast((LL.ri+1)+'회차 — 같은 위치에서 다시 재세요'); }
+    save(); render(); return;
+  }
+  if(t.dataset.unit !== undefined){ state.cur.unit = +t.dataset.unit; state.cur.step = 0; save(); render(); return; }
+  if(t.dataset.step !== undefined){ state.cur.step = +t.dataset.step; save(); render(); return; }
+  if(t.dataset.say !== undefined){ say(t.dataset.say); return; }
+  if(t.dataset.off !== undefined){ state.settings.offset = +t.dataset.off; save(); render(); toast('줄자 기점 '+t.dataset.off); return; }
+  if(t.dataset.del !== undefined){ var i = +t.dataset.del; confirmBox(esc(state.units[i].name)+' 호기를 삭제할까요? 실측 기록도 함께 지워집니다.', function(){ state.units.splice(i,1); state.cur.unit = 0; state.cur.step = 0; save(); render(); }); return; }
+  if(t.dataset.clearph !== undefined){ var id = t.dataset.clearph; confirmBox('이 호기 사진을 지울까요?', function(){ delete photos[id]; savePhotos(); render(); }); return; }
+  if(t.id === 'markDone'){ var u = state.units[state.cur.unit]; var d = new Date(); u.done = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); save(); render(); toast(u.name+' 완료'); return; }
+  if(t.id === 'undoDone'){ state.units[state.cur.unit].done = null; save(); render(); return; }
+  if(t.id === 'addUnit'){ var nu = defaultUnit('#'+(state.units.length+1),'',''), ref = state.units[state.units.length-1]; if(ref){ nu.L = ref.L; nu.W = ref.W; } state.units.push(nu); save(); render(); return; }
+  if(t.id === 'resetAll'){ confirmBox('모든 호기의 실측값·체크·완료 표시를 지울까요? 설비 치수는 남습니다.', function(){ state.units.forEach(function(u){ u.meas = {}; u.checks = {}; u.done = null; u.checker = ''; }); state.cur.step = 0; save(); render(); toast('기록을 지웠습니다'); }); return; }
+  if(t.id === 'csvBtn'){ saveCsv(); return; }
+  if(t.id === 'copyBtn'){ copyText(buildText()); return; }
+});
+
+main.addEventListener('input', function(e){
+  var t = e.target;
+  if(t.dataset.lk){
+    var lu = state.units[state.cur.unit], LR = ensureLev(lu), rd = LR.rounds[LR.ri];
+    rd.v[t.dataset.lk] = num(t.value);
+    if(!rd.at){ rd.at = new Date().toLocaleString('ko-KR'); }
+    refreshLevel(lu); refreshDots(lu); save(); return;
+  }
+  if(t.dataset.lv){
+    var lu2 = state.units[state.cur.unit], L2 = ensureLev(lu2), key2 = t.dataset.lv;
+    if(key2 === 'xs') L2.xs = t.value;
+    else if(key2 === 'n'){ var nn = Math.round(num(t.value)||0); if(nn >= 2 && nn <= 12) L2.n = nn; }
+    else L2[key2] = num(t.value);
+    if(key2 !== 'n' && key2 !== 'xs') refreshLevel(lu2);
+    save(); return;
+  }
+  if(t.dataset.k){
+    var u = state.units[state.cur.unit], m = u.meas[t.dataset.k] || (u.meas[t.dataset.k] = {});
+    var st = steps(u)[state.cur.step], f = (st.fields||[]).filter(function(x){ return x.k === t.dataset.k; })[0];
+    var r = num(t.value);
+    m[t.dataset.n] = r === null ? null : r - (f && f.raw ? 0 : state.settings.offset);
+    if(f){ var res = fieldResult(u, f), el = document.getElementById('res-'+f.k); el.className = 'res '+resClass(res); el.textContent = resText(res); }
+    if(st.diag){ document.getElementById('diagBox').innerHTML = diagBanner(u); }
+    refreshDots(u);
+    save(); return;
+  }
+  if(t.dataset.s){ var key = t.dataset.s; state.settings[key] = key === 'worker' ? t.value : (num(t.value) === null ? 0 : num(t.value)); save(); return; }
+  if(t.dataset.ui !== undefined){
+    var uu = state.units[+t.dataset.ui], k = t.dataset.uk;
+    if(k === 'name' || k === 'sched' || k === 'ports') uu[k] = t.value;
+    else if(k === 'L' || k === 'W') return;
+    else { uu[k] = num(t.value); }
+    save(); return;
+  }
+  if(t.dataset.u){ state.units[state.cur.unit][t.dataset.u] = t.value; save(); return; }
+  if(state.tab === 'calc') calcAll();
+});
+main.addEventListener('change', function(e){
+  var t = e.target;
+  if(t.dataset.sz){ var su = state.units[state.cur.unit]; if(!setSize(su, t.dataset.sz, t.value)) t.value = su[t.dataset.sz]; save(); render(); return; }
+  if(t.dataset.ui !== undefined && (t.dataset.uk === 'L' || t.dataset.uk === 'W')){ var su2 = state.units[+t.dataset.ui]; if(!setSize(su2, t.dataset.uk, t.value)) t.value = su2[t.dataset.uk]; save(); render(); return; }
+  if(t.dataset.lvchk){ ensureLev(state.units[state.cur.unit]).checks[t.dataset.lvchk] = t.checked; save(); return; }
+  if(t.dataset.lv === 'n' || t.dataset.lv === 'xs'){ ensureLev(state.units[state.cur.unit]).cfgOpen = true; render(); return; }
+  if(t.dataset.chk){ var u = state.units[state.cur.unit]; u.checks[t.dataset.chk] = t.checked; refreshDots(u); save(); return; }
+  if(t.dataset.photo !== undefined && t.files && t.files[0]){ addPhoto(t.files[0], +t.dataset.photo); return; }
+  if(t.dataset.ui !== undefined && state.tab === 'setup'){ render(); }
+});
+function refreshDots(u){
+  var ss = steps(u);
+  document.querySelectorAll('.dots button').forEach(function(b, i){
+    var s = stepStatus(u, ss[i]); b.classList.toggle('ok', s==='ok'); b.classList.toggle('ng', s==='ng');
+  });
+}
+
+function addPhoto(file, slot){
+  var u = state.units[state.cur.unit];
+  var rd = new FileReader();
+  rd.onload = function(){
+    var img = new Image();
+    img.onload = function(){
+      var max = 640, w = img.width, h = img.height, r = Math.min(1, max / Math.max(w, h));
+      var c = document.createElement('canvas'); c.width = Math.round(w*r); c.height = Math.round(h*r);
+      var ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, c.width, c.height);
+      ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(0, c.height-26, c.width, 26);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 16px sans-serif';
+      ctx.fillText(u.name + ' · ' + new Date().toLocaleString('ko-KR'), 8, c.height-8);
+      (photos[u.id] || (photos[u.id] = {}))[slot] = c.toDataURL('image/jpeg', 0.6);
+      if(savePhotos()) toast('사진 저장');
+      render();
+    };
+    img.src = rd.result;
+  };
+  rd.readAsDataURL(file);
+}
+
+/* 읽어주기 */
+function say(n){
+  try{
+    var u = new SpeechSynthesisUtterance(String(Math.round(Number(n)*10)/10));
+    u.lang = 'ko-KR'; u.rate = 0.9;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  }catch(e){ toast('이 기기에서는 읽어주기를 쓸 수 없습니다'); }
+}
+
+/* 내보내기 */
+function buildRows(){
+  var rows = [['호기','일정','항목','기준(mm)','1차(mm)','2차(mm)','실측(mm)','편차(mm)','판정']];
+  state.units.forEach(function(u){
+    steps(u).forEach(function(st){
+      (st.fields||[]).forEach(function(f){
+        var r = fieldResult(u, f);
+        rows.push([u.name, u.sched, f.label, fmtRaw(num(f.target)), fmtRaw(r.a1), fmtRaw(r.a2), fmtRaw(r.v), r.dev!==undefined?fmtRaw(r.dev):'', r.st==='ok'?'OK':r.st==='ng'?'NG':r.st==='info'?'기록':'']);
+      });
+    });
+    var d = diagResult(u);
+    rows.push([u.name, u.sched, '대각선 차이', '≤'+state.settings.tolDiag, '', '', d?fmtRaw(Math.abs(d.diff)):'', '', d?(d.ok?'OK':'NG'):'']);
+    rows.push([u.name, u.sched, '완료/작업자/확인자', '', '', '', u.done||'', u.worker||state.settings.worker||'', u.checker||'']);
+    if(u.lev){
+      u.lev.rounds.forEach(function(rd, i){
+        var x = levCalc(u, rd); if(!x) return;
+        levKeys(u).forEach(function(k){
+          if(x.adj[k] === undefined) return;
+          rows.push([u.name, u.sched, '레벨링 '+(i+1)+'회차 '+footName(k), '', String(rd.v[k]), '', '', String(Math.round(x.adj[k]*100)/100), x.adj[k]>0?'올림':x.adj[k]<0?'내림':'맞음']);
+        });
+        rows.push([u.name, u.sched, '레벨링 '+(i+1)+'회차 평탄도/길이/폭 기울기', '≤'+u.lev.tolFlat, String(Math.round(x.flat*100)/100), x.tx===undefined?'':String(Math.round(x.tx*1000)/1000), x.ty===undefined?'':String(Math.round(x.ty*1000)/1000), '', x.ok?'OK':'NG']);
+      });
+    }
+  });
+  return rows;
+}
+function fmtRaw(n){ return n===null||n===undefined||!isFinite(n) ? '' : String(Math.round(n*10)/10); }
+function buildText(){ return buildRows().map(function(r){ return r.join('\t'); }).join('\n'); }
+function saveCsv(){
+  var csv = '﻿' + buildRows().map(function(r){ return r.map(function(c){ c = String(c); return /[",\n]/.test(c) ? '"'+c.replace(/"/g,'""')+'"' : c; }).join(','); }).join('\r\n');
+  var d = new Date(), name = '라인마킹_기록_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'.csv';
+  if(!(window.claude && window.claude.use)){ blobDownload(name, csv); return; }
+  var p = window.claude.use('downloads');
+  p.then(function(dl){
+    if(!dl){ copyText(buildText()); toast('파일 저장을 쓸 수 없어 텍스트로 복사했습니다'); return; }
+    return dl.save({filename:name, data:csv}).then(function(){ toast('CSV 저장'); }, function(){ toast('저장이 취소되었습니다'); });
+  }).catch(function(){ copyText(buildText()); });
+}
+function blobDownload(name, data){
+  try{
+    var type = /\.html$/.test(name) ? 'text/html;charset=utf-8' : 'text/csv;charset=utf-8';
+    var url = URL.createObjectURL(new Blob([data], {type:type}));
+    var a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 1500);
+    toast('저장했습니다');
+  }catch(e){ toast('저장에 실패했습니다'); }
+}
+function copyText(s){
+  try{ navigator.clipboard.writeText(s).then(function(){ toast('복사했습니다. 엑셀·카톡에 붙여넣기'); }, function(){ toast('복사가 막혔습니다'); }); }
+  catch(e){ toast('복사가 막혔습니다'); }
+}
+
+/* 공통 UI */
+var tt;
+function toast(s){ var el = document.getElementById('toast'); el.textContent = s; el.classList.add('show'); clearTimeout(tt); tt = setTimeout(function(){ el.classList.remove('show'); }, 2200); }
+var modalCb = null;
+function confirmBox(html, cb){ document.getElementById('modalMsg').innerHTML = html; modalCb = cb; document.getElementById('modal').classList.add('show'); }
+document.getElementById('modalNo').onclick = function(){ document.getElementById('modal').classList.remove('show'); modalCb = null; };
+document.getElementById('modalYes').onclick = function(){ document.getElementById('modal').classList.remove('show'); var c = modalCb; modalCb = null; if(c) c(); };
+
+/* ---------- 견적 · 공수 · 파츠 ---------- */
+function uid(){ return Math.random().toString(36).slice(2,9); }
+var STD_PROCS = [
+  ['자재 입고·하차·수량 검수', false], ['자재 보관·현장 내 운반', false], ['설비 반입·양중', true],
+  ['라인마킹', true], ['설비 위치 맞춤', true], ['레벨링', true], ['모듈 조립·체결', true],
+  ['앵커·고정', true], ['토크 확인·체결 마킹', true], ['사진·기록·검수 대응', true],
+  ['정리·청소·폐기물', false], ['안전교육·TBM', false], ['대기·이동·셋업', false]
+];
+var STD_EXPS = ['장비 임대 (지게차·리프트 등)', '공구·소모품', '출장비 (숙박·식대·교통)', '자재 운반비', '폐기물 처리'];
+var PART_PRESETS = [
+  {cat:'볼트', name:'육각볼트', spec:'M12×40'}, {cat:'너트', name:'육각너트', spec:'M12'},
+  {cat:'와셔', name:'평와셔', spec:'M12'}, {cat:'와셔', name:'스프링와셔', spec:'M12'},
+  {cat:'앵커', name:'앵커볼트', spec:''}, {cat:'레벨링', name:'레벨링 풋', spec:'', auto:'feet'},
+  {cat:'레벨링', name:'레벨링 풋 락너트', spec:'', auto:'feet'}, {cat:'소모품', name:'마킹 테이프', spec:''}
+];
+function ensureEst(){
+  if(!state.est){
+    state.est = {
+      sub:'plan', project:{name:'', client:'', site:'', date:''},
+      hpd:8,
+      grades:[{id:'g1', name:'기술자', rate:null},{id:'g2', name:'보조', rate:null}],
+      procs: STD_PROCS.map(function(p){ return {id:uid(), name:p[0], perUnit:p[1], grade:'g1', men:null, hours:null, na:false, std:true}; }),
+      logs:[], parts:[],
+      exps: STD_EXPS.map(function(n){ return {id:uid(), name:n, amt:null, na:false, std:true}; }),
+      overhead:null, profit:null, vat:10, basis:'actual'
+    };
+  }
+  return state.est;
+}
+function unitCount(){ return state.units.length || 1; }
+function gradeOf(E, id){ return E.grades.filter(function(g){ return g.id === id; })[0] || E.grades[0]; }
+function procPlanMH(E, p){ var m = num(p.men), h = num(p.hours); if(m === null || h === null) return null; return m*h*(p.perUnit ? unitCount() : 1); }
+function procActual(E, p){
+  var mh = 0, cost = 0, any = false, g = gradeOf(E, p.grade), rate = num(g && g.rate);
+  E.logs.forEach(function(l){ if(l.proc !== p.id) return; var m = num(l.men), h = num(l.hours); if(m===null||h===null) return; any = true; var x = m*h; mh += x; cost += rate===null ? 0 : x/E.hpd*rate*(1+(num(l.ot)||0)/100); });
+  return any ? {mh:mh, cost:cost} : null;
+}
+function procCost(E, p){
+  var g = gradeOf(E, p.grade), rate = num(g && g.rate);
+  var act = procActual(E, p), plan = procPlanMH(E, p);
+  var useAct = E.basis === 'actual' && act;
+  var mh = useAct ? act.mh : plan;
+  if(mh === null) return {mh:null, md:null, cost:null, src:'—'};
+  var cost = rate === null ? null : (useAct ? act.cost : mh/E.hpd*rate);
+  return {mh:mh, md:mh/E.hpd, cost:cost, src:useAct?'실적':'계획', rate:rate};
+}
+function feetPerUnit(u){ return u.lev ? u.lev.n*2 : 8; }
+function partQty(p){
+  var per = p.auto === 'feet' ? null : num(p.qty);
+  var base = 0;
+  if(p.auto === 'feet') state.units.forEach(function(u){ base += feetPerUnit(u); });
+  else if(per !== null) base = per * (p.perUnit === false ? 1 : unitCount());
+  else return null;
+  var sp = num(p.spare) || 0;
+  return Math.ceil(base * (1 + sp/100) - 1e-9);
+}
+function partAmt(p){ var q = partQty(p), pr = num(p.price); return (q===null||pr===null) ? null : q*pr; }
+function missingList(E){
+  var m = [];
+  if(E.grades.some(function(g){ return num(g.rate) === null; })) m.push({t:'노임 단가 미입력 ('+E.grades.filter(function(g){ return num(g.rate)===null; }).map(function(g){ return g.name; }).join(', ')+')', go:'quote'});
+  E.procs.forEach(function(p){ if(p.na) return; var c = procCost(E, p); if(c.mh === null) m.push({t:'공수 없음: '+p.name, go:'plan'}); });
+  E.exps.forEach(function(x){ if(!x.na && num(x.amt) === null) m.push({t:'경비 없음: '+x.name, go:'quote'}); });
+  if(!E.parts.length) m.push({t:'파츠 리스트가 비어 있음', go:'parts'});
+  E.parts.forEach(function(p){ if(partQty(p) === null) m.push({t:'수량 없음: '+p.name+(p.spec?' '+p.spec:''), go:'parts'}); else if(num(p.price) === null) m.push({t:'단가 없음: '+p.name+(p.spec?' '+p.spec:''), go:'parts'}); });
+  if(num(E.overhead) === null) m.push({t:'일반관리비 % 미입력 (없으면 0)', go:'quote'});
+  if(num(E.profit) === null) m.push({t:'이윤 % 미입력 (없으면 0)', go:'quote'});
+  return m;
+}
+function totals(E){
+  var labor = 0, mat = 0, exp = 0, mh = 0;
+  E.procs.forEach(function(p){ if(p.na) return; var c = procCost(E, p); if(c.cost) labor += c.cost; if(c.mh) mh += c.mh; });
+  E.parts.forEach(function(p){ var a = partAmt(p); if(a) mat += a; });
+  E.exps.forEach(function(x){ if(!x.na && num(x.amt)) exp += num(x.amt); });
+  var direct = labor + mat + exp, oh = direct*(num(E.overhead)||0)/100, pf = (direct+oh)*(num(E.profit)||0)/100;
+  var supply = Math.floor((direct + oh + pf)/1000)*1000, vat = Math.round(supply*(num(E.vat)||0)/100);
+  return {labor:labor, mat:mat, exp:exp, mh:mh, md:mh/E.hpd, direct:direct, oh:oh, pf:pf, supply:supply, vat:vat, total:supply+vat};
+}
+function won(n){ return n===null||n===undefined||!isFinite(n) ? '—' : Math.round(n).toLocaleString('ko-KR'); }
+function inp(attrs, val, ph, typ){ return '<input '+attrs+(typ?' type="'+typ+'"':'')+' value="'+(val===null||val===undefined?'':esc(val))+'"'+(ph?' placeholder="'+esc(ph)+'"':'')+'>'; }
+
+function renderEst(){
+  var E = ensureEst(), miss = missingList(E), T = totals(E);
+  var h = '<div class="card"><h2>견적 · 공수</h2><div class="grid2">'
+    + '<div><label>공사명</label>'+inp('data-ep="name"', E.project.name, 'N2 Stocker 3대 설치')+'</div>'
+    + '<div><label>고객사</label>'+inp('data-ep="client"', E.project.client)+'</div>'
+    + '<div><label>현장</label>'+inp('data-ep="site"', E.project.site)+'</div>'
+    + '<div><label>견적일</label>'+inp('data-ep="date"', E.project.date, '', 'date')+'</div></div>'
+    + '<div class="kpi"><div><b>'+fmt(T.md,1)+'</b><span>총 공수 (인·일)</span></div><div><b>'+won(T.total/10000)+'</b><span>합계 (만원)</span></div><div class="'+(miss.length?'ng':'ok')+'"><b>'+miss.length+'</b><span>누락 점검</span></div></div></div>';
+  var subs = [['plan','공수 계획'],['log','작업 실적'],['parts','파츠'],['quote','견적서']];
+  h += '<div class="seg" style="margin-bottom:10px">' + subs.map(function(s){ return '<button data-esub="'+s[0]+'" class="'+(E.sub===s[0]?'on':'')+'">'+s[1]+'</button>'; }).join('') + '</div>';
+  if(miss.length && E.sub !== 'quote') h += '<div class="banner warn" style="margin-top:0;margin-bottom:12px">누락 점검 '+miss.length+'건 — 견적서 탭에서 전체 목록을 볼 수 있습니다.</div>';
+  if(E.sub === 'plan') h += estPlan(E);
+  else if(E.sub === 'log') h += estLog(E);
+  else if(E.sub === 'parts') h += estParts(E);
+  else h += estQuote(E, miss, T);
+  main.innerHTML = h;
+}
+
+function estPlan(E){
+  var h = '<div class="card"><h2>공정별 공수</h2><div class="muted">인원 × 시간. "호기당"이면 호기 수('+unitCount()+'대)를 곱합니다. 하지 않는 작업은 "해당 없음"으로 표시해야 누락 점검에서 빠집니다.</div>';
+  E.procs.forEach(function(p, i){
+    var c = procCost(E, p), act = procActual(E, p), plan = procPlanMH(E, p);
+    h += '<div class="field" style="'+(p.na?'opacity:.5':'')+'"><div class="top"><div style="flex:1">'+(p.std?'<div class="lbl">'+(i+1)+'. '+esc(p.name)+'</div>':inp('data-pp="'+p.id+'" data-pk="name"', p.name, '작업명'))+'</div>'
+      + '<label class="row" style="font-size:13px;gap:4px;flex:none"><input type="checkbox" data-pna="'+p.id+'"'+(p.na?' checked':'')+' style="width:20px;height:20px">해당 없음</label></div>';
+    if(!p.na){
+      h += '<div class="grid2" style="grid-template-columns:1fr 1fr 1fr;margin-top:6px"><div><label>인원</label>'+inp('inputmode="decimal" data-pp="'+p.id+'" data-pk="men"', p.men)+'</div><div><label>시간 (h)</label>'+inp('inputmode="decimal" data-pp="'+p.id+'" data-pk="hours"', p.hours)+'</div>'
+        + '<div><label>직종</label><select data-pp="'+p.id+'" data-pk="grade">'+E.grades.map(function(g){ return '<option value="'+g.id+'"'+(g.id===p.grade?' selected':'')+'>'+esc(g.name)+'</option>'; }).join('')+'</select></div></div>';
+      h += '<div class="row" style="margin-top:6px;justify-content:space-between"><label class="row" style="font-size:14px;gap:6px"><input type="checkbox" data-pper="'+p.id+'"'+(p.perUnit?' checked':'')+' style="width:20px;height:20px">호기당 (×'+unitCount()+')</label>'
+        + '<span class="muted" id="pl-'+p.id+'">계획 '+(plan===null?'—':fmt(plan,1)+' MH')+' · 실적 '+(act?fmt(act.mh,1)+' MH':'—')+(plan!==null&&act?' · <b style="color:'+(act.mh>plan?'var(--ng)':'var(--ok)')+'">'+sgn(act.mh-plan)+'</b>':'')+'</span></div>';
+    }
+    if(!p.std) h += '<button class="btn sec sm" data-pdel="'+p.id+'" style="margin-top:6px">삭제</button>';
+    h += '</div>';
+  });
+  h += '<button class="btn sec" style="width:100%;margin-top:10px" id="procAdd">작업 추가</button></div>';
+  h += '<div class="card"><h2>직종 · 노임 단가</h2><div class="muted">1일 = '+E.hpd+'시간 기준 (인·일 = 공수 ÷ '+E.hpd+')</div>';
+  E.grades.forEach(function(g){ h += '<div class="grid2 f"><div><label>직종</label>'+inp('data-gg="'+g.id+'" data-gk="name"', g.name)+'</div><div><label>노임 단가 (원/인·일)</label>'+inp('inputmode="numeric" data-gg="'+g.id+'" data-gk="rate"', g.rate, '예: 직접 입력')+'</div></div>'; });
+  h += '<div class="row" style="margin-top:8px"><button class="btn sec sm" id="gradeAdd">직종 추가</button><div style="flex:1"></div><label class="muted">1일 시간</label><input inputmode="decimal" data-ehpd="1" value="'+E.hpd+'" style="width:70px;padding:8px;border:1px solid var(--line);border-radius:10px"></div></div>';
+  return h;
+}
+
+function estLog(E){
+  var today = new Date(); var td = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
+  var d = E.draft || (E.draft = {date:td, proc:E.procs[0] && E.procs[0].id, unit:'', men:null, hours:null, ot:0, memo:''});
+  var h = '<div class="card"><h2>작업 실적 입력 (작업일보)</h2><div class="muted">실제로 일한 인원·시간을 매일 남기면 견적이 실적 기준으로 계산됩니다. 할증은 야간·휴일 등.</div>';
+  h += '<div class="grid2 f"><div><label>날짜</label>'+inp('data-ld="date"', d.date, '', 'date')+'</div><div><label>호기</label><select data-ld="unit"><option value="">공통</option>'+state.units.map(function(u){ return '<option value="'+u.id+'"'+(d.unit===u.id?' selected':'')+'>'+esc(u.name)+'</option>'; }).join('')+'</select></div></div>';
+  h += '<div class="f"><label>작업</label><select data-ld="proc">'+E.procs.filter(function(p){ return !p.na; }).map(function(p){ return '<option value="'+p.id+'"'+(d.proc===p.id?' selected':'')+'>'+esc(p.name)+'</option>'; }).join('')+'</select></div>';
+  h += '<div class="grid2 f" style="grid-template-columns:1fr 1fr 1fr"><div><label>인원</label>'+inp('inputmode="decimal" data-ld="men"', d.men)+'</div><div><label>시간 (h)</label>'+inp('inputmode="decimal" data-ld="hours"', d.hours)+'</div><div><label>할증</label><select data-ld="ot">'+[0,50,100].map(function(o){ return '<option value="'+o+'"'+(+d.ot===o?' selected':'')+'>'+(o?'+'+o+'%':'없음')+'</option>'; }).join('')+'</select></div></div>';
+  h += '<div class="f"><label>메모 (재작업·대기 사유 등)</label>'+inp('data-ld="memo"', d.memo)+'</div>';
+  h += '<button class="btn" style="width:100%;margin-top:10px" id="logAdd">실적 추가</button></div>';
+  var byDate = {};
+  E.logs.forEach(function(l){ (byDate[l.date] = byDate[l.date] || []).push(l); });
+  var dates = Object.keys(byDate).sort().reverse();
+  if(!dates.length) h += '<div class="card muted">아직 실적이 없습니다.</div>';
+  dates.forEach(function(dt){
+    var sum = byDate[dt].reduce(function(a, l){ return a + (num(l.men)||0)*(num(l.hours)||0); }, 0);
+    h += '<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">'+esc(dt)+'</h2><span class="muted">'+fmt(sum,1)+' MH · '+fmt(sum/E.hpd,2)+' 인·일</span></div><table style="margin-top:6px"><tr><th>작업</th><th>호기</th><th>인원×h</th><th>할증</th><th></th></tr>';
+    byDate[dt].forEach(function(l){
+      var p = E.procs.filter(function(x){ return x.id === l.proc; })[0], u = state.units.filter(function(x){ return x.id === l.unit; })[0];
+      h += '<tr><td>'+esc(p?p.name:'(삭제된 작업)')+(l.memo?'<br><span class="muted">'+esc(l.memo)+'</span>':'')+'</td><td>'+esc(u?u.name:'공통')+'</td><td>'+fmt(num(l.men))+'×'+fmt(num(l.hours))+'</td><td>'+(num(l.ot)?'+'+l.ot+'%':'—')+'</td><td><button class="btn sec sm" data-ldel="'+l.id+'" style="min-height:32px;padding:4px 8px">삭제</button></td></tr>';
+    });
+    h += '</table></div>';
+  });
+  return h;
+}
+
+function estParts(E){
+  var h = '<div class="card"><h2>파츠 리스트</h2><div class="muted">수량은 호기당 기준 → 호기 수('+unitCount()+'대)와 여유율을 곱해 총수량을 올림 계산합니다. 레벨링 풋·락너트는 레벨링 발 개수와 연동됩니다.</div>';
+  h += '<div class="muted" style="margin-top:8px">빠른 추가</div><div class="rounds">' + PART_PRESETS.map(function(p, i){ return '<button data-padd="'+i+'">+ '+esc(p.name)+(p.spec?' '+esc(p.spec):'')+'</button>'; }).join('') + '<button data-padd="-1">+ 직접 입력</button></div></div>';
+  var cats = {};
+  E.parts.forEach(function(p){ (cats[p.cat||'기타'] = cats[p.cat||'기타'] || []).push(p); });
+  Object.keys(cats).forEach(function(c){
+    h += '<div class="card"><h2>'+esc(c)+'</h2>';
+    cats[c].forEach(function(p){
+      var q = partQty(p), a = partAmt(p);
+      h += '<div class="field"><div class="grid2"><div><label>품명</label>'+inp('data-pt="'+p.id+'" data-tk="name"', p.name)+'</div><div><label>규격 (재질·길이)</label>'+inp('data-pt="'+p.id+'" data-tk="spec"', p.spec, '예: M12×40 SUS304')+'</div></div>';
+      h += '<div class="grid2" style="grid-template-columns:1fr 1fr 1fr;margin-top:6px">';
+      if(p.auto === 'feet') h += '<div><label>호기당 수량</label><div style="padding:10px 0;font-weight:700">발 개수 연동</div></div>';
+      else h += '<div><label>'+(p.perUnit===false?'전체 수량':'호기당 수량')+'</label>'+inp('inputmode="decimal" data-pt="'+p.id+'" data-tk="qty"', p.qty)+'</div>';
+      h += '<div><label>여유율 %</label>'+inp('inputmode="decimal" data-pt="'+p.id+'" data-tk="spare"', p.spare)+'</div><div><label>단가 (원)</label>'+inp('inputmode="numeric" data-pt="'+p.id+'" data-tk="price"', p.price)+'</div></div>';
+      h += '<div class="grid2" style="margin-top:6px"><div><label>분류</label>'+inp('data-pt="'+p.id+'" data-tk="cat"', p.cat)+'</div><div><label>단위</label>'+inp('data-pt="'+p.id+'" data-tk="unit"', p.unit||'EA')+'</div></div>';
+      h += '<div class="row" style="justify-content:space-between;margin-top:8px"><b id="pq-'+p.id+'">총 '+(q===null?'—':fmt(q,0)+' '+esc(p.unit||'EA'))+' · '+won(a)+' 원</b><span class="row" style="gap:6px">'+(p.auto==='feet'?'':'<label class="row" style="font-size:13px;gap:4px"><input type="checkbox" data-ptper="'+p.id+'"'+(p.perUnit===false?'':' checked')+' style="width:18px;height:18px">호기당</label>')+'<button class="btn sec sm" data-ptdel="'+p.id+'">삭제</button></span></div></div>';
+    });
+    h += '</div>';
+  });
+  var T = totals(E);
+  h += '<div class="card"><b>자재비 합계 '+won(T.mat)+' 원</b><div class="row" style="margin-top:8px"><button class="btn sm" id="partsCsv">파츠 리스트 CSV 저장</button><button class="btn sec sm" id="partsCopy">텍스트 복사</button></div></div>';
+  return h;
+}
+
+function estQuote(E, miss, T){
+  var h = '';
+  h += '<div class="card"><h2>누락 점검</h2>' + (miss.length ? '<div class="muted">모두 채우거나 "해당 없음"으로 표시하면 0건이 됩니다.</div>'+miss.map(function(m){ return '<button class="chk" style="width:100%;text-align:left;background:#fff" data-ego="'+m.go+'">⚠ '+esc(m.t)+'</button>'; }).join('') : '<div class="banner ok">누락 없음 — 견적서를 내보낼 수 있습니다.</div>') + '</div>';
+  h += '<div class="card"><h2>경비</h2>';
+  E.exps.forEach(function(x){
+    h += '<div class="row f" style="'+(x.na?'opacity:.5':'')+'"><div style="flex:1;min-width:150px">'+(x.std?'<b>'+esc(x.name)+'</b>':inp('data-xx="'+x.id+'" data-xk="name"', x.name, '경비 항목'))+'</div>'
+      + (x.na?'':'<input inputmode="numeric" data-xx="'+x.id+'" data-xk="amt" value="'+(x.amt===null||x.amt===undefined?'':x.amt)+'" placeholder="금액 (원)" style="width:130px;padding:10px;border:1px solid var(--line);border-radius:10px">')
+      + '<label class="row" style="font-size:13px;gap:4px"><input type="checkbox" data-xna="'+x.id+'"'+(x.na?' checked':'')+' style="width:20px;height:20px">해당 없음</label>'+(x.std?'':'<button class="btn sec sm" data-xdel="'+x.id+'">삭제</button>')+'</div>';
+  });
+  h += '<button class="btn sec sm" style="margin-top:10px" id="expAdd">경비 추가</button></div>';
+  h += '<div class="card"><h2>요율</h2><div class="grid2" style="grid-template-columns:1fr 1fr 1fr"><div><label>일반관리비 %</label>'+inp('inputmode="decimal" data-er="overhead"', E.overhead)+'</div><div><label>이윤 %</label>'+inp('inputmode="decimal" data-er="profit"', E.profit)+'</div><div><label>부가세 %</label>'+inp('inputmode="decimal" data-er="vat"', E.vat)+'</div></div>';
+  h += '<div class="f"><label>노무비 기준</label><div class="seg"><button data-ebasis="actual" class="'+(E.basis==='actual'?'on':'')+'">실적 우선 (없으면 계획)</button><button data-ebasis="plan" class="'+(E.basis==='plan'?'on':'')+'">계획만</button></div></div></div>';
+  h += '<div class="card" id="quoteDoc">' + quoteHtml(E, T) + '</div>';
+  h += '<div class="card"><div class="row"><button class="btn" id="quoteSave">견적서 파일 저장 (HTML · 인쇄용)</button><button class="btn sec sm" id="quoteCsv">CSV</button><button class="btn sec sm" id="quoteCopy">텍스트 복사</button></div>'+(miss.length?'<div class="banner warn">누락 점검 '+miss.length+'건이 남아 있습니다. 그대로 내보내면 견적서에 "가견적"으로 표시됩니다.</div>':'')+'</div>';
+  return h;
+}
+function quoteHtml(E, T){
+  var P = E.project, miss = missingList(E);
+  var h = '<div style="text-align:center"><div style="font-size:24px;font-weight:800;letter-spacing:6px">견 적 서'+(miss.length?' <span style="font-size:14px;color:#b45309;letter-spacing:0">(가견적)</span>':'')+'</div></div>';
+  h += '<table style="margin-top:10px"><tr><td>공사명</td><td style="text-align:left">'+esc(P.name||'')+'</td></tr><tr><td>고객사</td><td style="text-align:left">'+esc(P.client||'')+'</td></tr><tr><td>현장</td><td style="text-align:left">'+esc(P.site||'')+'</td></tr><tr><td>견적일</td><td style="text-align:left">'+esc(P.date||'')+'</td></tr><tr><td>대상</td><td style="text-align:left">'+state.units.map(function(u){ return esc(u.name); }).join(', ')+' ('+unitCount()+'대)</td></tr></table>';
+  h += '<div style="margin:12px 0;padding:10px;border:2px solid #111827;border-radius:8px;font-size:18px;font-weight:800;text-align:center">합계 '+won(T.total)+' 원 <span style="font-size:13px;font-weight:600">(VAT '+(num(E.vat)?'포함':'별도')+')</span></div>';
+  h += '<h3>1. 노무비</h3><table><tr><th>작업</th><th>공수(MH)</th><th>인·일</th><th>단가</th><th>금액</th></tr>';
+  E.procs.forEach(function(p){ if(p.na) return; var c = procCost(E, p); h += '<tr><td>'+esc(p.name)+' <span style="color:#6b7280;font-size:11px">'+c.src+'</span></td><td>'+fmt(c.mh,1)+'</td><td>'+fmt(c.md,2)+'</td><td>'+won(c.rate)+'</td><td>'+won(c.cost)+'</td></tr>'; });
+  h += '<tr><th>소계</th><th>'+fmt(T.mh,1)+'</th><th>'+fmt(T.md,2)+'</th><th></th><th>'+won(T.labor)+'</th></tr></table>';
+  h += '<h3>2. 자재비</h3><table><tr><th>품명·규격</th><th>수량</th><th>단가</th><th>금액</th></tr>';
+  E.parts.forEach(function(p){ var q = partQty(p); h += '<tr><td>'+esc(p.name)+' '+esc(p.spec||'')+'</td><td>'+(q===null?'—':fmt(q,0)+' '+esc(p.unit||'EA'))+'</td><td>'+won(num(p.price))+'</td><td>'+won(partAmt(p))+'</td></tr>'; });
+  h += '<tr><th>소계</th><th></th><th></th><th>'+won(T.mat)+'</th></tr></table>';
+  h += '<h3>3. 경비</h3><table>';
+  E.exps.forEach(function(x){ if(!x.na) h += '<tr><td>'+esc(x.name)+'</td><td>'+won(num(x.amt))+'</td></tr>'; });
+  h += '<tr><th>소계</th><th>'+won(T.exp)+'</th></tr></table>';
+  h += '<h3>4. 합계</h3><table><tr><td>직접비 (1+2+3)</td><td>'+won(T.direct)+'</td></tr><tr><td>일반관리비 '+(num(E.overhead)||0)+'%</td><td>'+won(T.oh)+'</td></tr><tr><td>이윤 '+(num(E.profit)||0)+'%</td><td>'+won(T.pf)+'</td></tr><tr><td>공급가액 (천원 미만 절사)</td><td>'+won(T.supply)+'</td></tr><tr><td>부가세 '+(num(E.vat)||0)+'%</td><td>'+won(T.vat)+'</td></tr><tr><th>합계</th><th>'+won(T.total)+'</th></tr></table>';
+  return h;
+}
+function quoteRows(E){
+  var T = totals(E), r = [['구분','항목','수량/공수','단위','단가','금액','비고']];
+  E.procs.forEach(function(p){ if(p.na){ r.push(['노무비', p.name, '', '', '', '', '해당 없음']); return; } var c = procCost(E, p); r.push(['노무비', p.name, c.md===null?'':String(Math.round(c.md*100)/100), '인·일', c.rate===null||c.rate===undefined?'':String(c.rate), c.cost===null?'':String(Math.round(c.cost)), c.src+(c.mh!==null?' '+Math.round(c.mh*10)/10+'MH':'')]); });
+  E.parts.forEach(function(p){ var q = partQty(p), a = partAmt(p); r.push(['자재비', p.name+' '+(p.spec||''), q===null?'':String(q), p.unit||'EA', p.price===null||p.price===undefined?'':String(p.price), a===null?'':String(Math.round(a)), p.cat||'']); });
+  E.exps.forEach(function(x){ r.push(['경비', x.name, '', '', '', x.na?'':String(num(x.amt)===null?'':num(x.amt)), x.na?'해당 없음':'']); });
+  r.push(['합계','직접비','','','',String(Math.round(T.direct)),'']);
+  r.push(['합계','일반관리비 '+(num(E.overhead)||0)+'%','','','',String(Math.round(T.oh)),'']);
+  r.push(['합계','이윤 '+(num(E.profit)||0)+'%','','','',String(Math.round(T.pf)),'']);
+  r.push(['합계','공급가액','','','',String(T.supply),'천원 미만 절사']);
+  r.push(['합계','부가세','','','',String(T.vat),'']);
+  r.push(['합계','총액','','','',String(T.total),'']);
+  return r;
+}
+function partRows(E){
+  var r = [['분류','품명','규격','단위','호기당 수량','호기 수','여유율%','총수량','단가','금액']];
+  E.parts.forEach(function(p){ var q = partQty(p), a = partAmt(p); r.push([p.cat||'', p.name, p.spec||'', p.unit||'EA', p.auto==='feet'?'발 개수 연동':(p.qty===null||p.qty===undefined?'':String(p.qty)), p.perUnit===false?'1':String(unitCount()), String(num(p.spare)||0), q===null?'':String(q), p.price===null||p.price===undefined?'':String(p.price), a===null?'':String(Math.round(a))]); });
+  return r;
+}
+function toCsv(rows){ return '﻿' + rows.map(function(r){ return r.map(function(c){ c = String(c===null||c===undefined?'':c); return /[",\n]/.test(c) ? '"'+c.replace(/"/g,'""')+'"' : c; }).join(','); }).join('\r\n'); }
+function toTsv(rows){ return rows.map(function(r){ return r.join('\t'); }).join('\n'); }
+function stamp(){ var d = new Date(); return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0'); }
+function saveFile(name, data, fallbackText){
+  if(!(window.claude && window.claude.use)){ blobDownload(name, data); return; }
+  var p = window.claude.use('downloads');
+  p.then(function(dl){
+    if(!dl){ copyText(fallbackText); toast('파일 저장을 쓸 수 없어 텍스트로 복사했습니다'); return; }
+    return dl.save({filename:name, data:data}).then(function(){ toast('저장했습니다'); }, function(){ toast('저장이 취소되었습니다'); });
+  }).catch(function(){ copyText(fallbackText); });
+}
+function quoteFile(E){
+  var T = totals(E);
+  return '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>견적서 '+esc(E.project.name||'')+'</title><style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;max-width:760px;margin:24px auto;padding:0 16px;color:#111}table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}th,td{border:1px solid #999;padding:5px 6px;text-align:right}th:first-child,td:first-child{text-align:left}th{background:#f3f4f6}h3{margin:16px 0 4px}@media print{body{margin:0}}</style></head><body>'+quoteHtml(E, T)+'<p style="font-size:12px;color:#555;margin-top:16px">공수 기준: '+(E.basis==='actual'?'작업 실적 우선 (실적 없는 작업은 계획)':'계획')+' · 1일 '+E.hpd+'시간</p></body></html>';
+}
+
+function estRefresh(){ var y = window.scrollY; renderEst(); window.scrollTo(0, y); }
+function findById(arr, id){ return arr.filter(function(x){ return x.id === id; })[0]; }
+
+main.addEventListener('click', function(e){
+  if(state.tab !== 'est') return;
+  var E = ensureEst(), t = e.target.closest('[data-esub],[data-padd],[data-ptdel],[data-pdel],[data-ldel],[data-xdel],[data-ebasis],[data-ego],#procAdd,#gradeAdd,#logAdd,#expAdd,#partsCsv,#partsCopy,#quoteSave,#quoteCsv,#quoteCopy');
+  if(!t) return;
+  if(t.dataset.esub){ E.sub = t.dataset.esub; save(); renderEst(); window.scrollTo(0,0); return; }
+  if(t.dataset.ego){ E.sub = t.dataset.ego; save(); renderEst(); window.scrollTo(0,0); return; }
+  if(t.dataset.ebasis){ E.basis = t.dataset.ebasis; save(); estRefresh(); return; }
+  if(t.dataset.padd !== undefined){
+    var i = +t.dataset.padd, pr = i >= 0 ? PART_PRESETS[i] : {cat:'기타', name:'', spec:''};
+    E.parts.push({id:uid(), cat:pr.cat, name:pr.name, spec:pr.spec, unit:'EA', qty:null, spare:pr.auto?0:5, price:null, auto:pr.auto||null, perUnit:true});
+    save(); estRefresh(); toast((pr.name||'새 항목')+' 추가'); return;
+  }
+  if(t.dataset.ptdel){ E.parts = E.parts.filter(function(p){ return p.id !== t.dataset.ptdel; }); save(); estRefresh(); return; }
+  if(t.dataset.pdel){ E.procs = E.procs.filter(function(p){ return p.id !== t.dataset.pdel; }); save(); estRefresh(); return; }
+  if(t.dataset.ldel){ E.logs = E.logs.filter(function(l){ return l.id !== t.dataset.ldel; }); save(); estRefresh(); return; }
+  if(t.dataset.xdel){ E.exps = E.exps.filter(function(x){ return x.id !== t.dataset.xdel; }); save(); estRefresh(); return; }
+  if(t.id === 'procAdd'){ E.procs.push({id:uid(), name:'', perUnit:true, grade:E.grades[0].id, men:null, hours:null, na:false, std:false}); save(); estRefresh(); return; }
+  if(t.id === 'gradeAdd'){ E.grades.push({id:uid(), name:'직종'+(E.grades.length+1), rate:null}); save(); estRefresh(); return; }
+  if(t.id === 'expAdd'){ E.exps.push({id:uid(), name:'', amt:null, na:false, std:false}); save(); estRefresh(); return; }
+  if(t.id === 'logAdd'){
+    var d = E.draft || {};
+    if(!d.proc || num(d.men) === null || num(d.hours) === null){ toast('작업·인원·시간을 입력하세요'); return; }
+    E.logs.push({id:uid(), date:d.date, proc:d.proc, unit:d.unit||'', men:num(d.men), hours:num(d.hours), ot:+d.ot||0, memo:d.memo||''});
+    E.draft = {date:d.date, proc:d.proc, unit:d.unit, men:d.men, hours:null, ot:0, memo:''};
+    save(); estRefresh(); toast('실적 추가'); return;
+  }
+  if(t.id === 'partsCsv'){ saveFile('파츠리스트_'+stamp()+'.csv', toCsv(partRows(E)), toTsv(partRows(E))); return; }
+  if(t.id === 'partsCopy'){ copyText(toTsv(partRows(E))); return; }
+  if(t.id === 'quoteSave'){ saveFile('견적서_'+(E.project.name||'공사')+'_'+stamp()+'.html', quoteFile(E), toTsv(quoteRows(E))); return; }
+  if(t.id === 'quoteCsv'){ saveFile('견적서_'+stamp()+'.csv', toCsv(quoteRows(E)), toTsv(quoteRows(E))); return; }
+  if(t.id === 'quoteCopy'){ copyText(toTsv(quoteRows(E))); return; }
+});
+function estLive(){
+  var E = ensureEst(), T = totals(E), miss = missingList(E);
+  var k = document.querySelectorAll('.kpi div b');
+  if(k.length >= 3){ k[0].textContent = fmt(T.md,1); k[1].textContent = won(T.total/10000); k[2].textContent = miss.length; k[2].parentNode.className = miss.length?'ng':'ok'; }
+  var q = document.getElementById('quoteDoc'); if(q) q.innerHTML = quoteHtml(E, T);
+}
+main.addEventListener('input', function(e){
+  if(state.tab !== 'est') return;
+  var E = ensureEst(), t = e.target, d = t.dataset;
+  if(d.ep){ E.project[d.ep] = t.value; }
+  else if(d.pp){ var p = findById(E.procs, d.pp); if(!p) return; p[d.pk] = (d.pk==='name'||d.pk==='grade') ? t.value : num(t.value);
+    var pl = document.getElementById('pl-'+p.id); if(pl){ var plan = procPlanMH(E, p), act = procActual(E, p); pl.innerHTML = '계획 '+(plan===null?'—':fmt(plan,1)+' MH')+' · 실적 '+(act?fmt(act.mh,1)+' MH':'—')+(plan!==null&&act?' · <b style="color:'+(act.mh>plan?'var(--ng)':'var(--ok)')+'">'+sgn(act.mh-plan)+'</b>':''); } }
+  else if(d.gg){ var g = findById(E.grades, d.gg); if(!g) return; g[d.gk] = d.gk==='name' ? t.value : num(t.value); }
+  else if(d.ehpd){ var v = num(t.value); if(v && v > 0) E.hpd = v; }
+  else if(d.ld){ var dr = E.draft || (E.draft = {}); dr[d.ld] = (d.ld==='men'||d.ld==='hours') ? num(t.value) : t.value; save(); return; }
+  else if(d.pt){ var pt = findById(E.parts, d.pt); if(!pt) return; pt[d.tk] = (d.tk==='qty'||d.tk==='spare'||d.tk==='price') ? num(t.value) : t.value;
+    var el = document.getElementById('pq-'+pt.id), q = partQty(pt); if(el) el.textContent = '총 '+(q===null?'—':fmt(q,0)+' '+(pt.unit||'EA'))+' · '+won(partAmt(pt))+' 원'; }
+  else if(d.xx){ var x = findById(E.exps, d.xx); if(!x) return; x[d.xk] = d.xk==='name' ? t.value : num(t.value); }
+  else if(d.er){ E[d.er] = num(t.value); }
+  else return;
+  save(); estLive();
+});
+main.addEventListener('change', function(e){
+  if(state.tab !== 'est') return;
+  var E = ensureEst(), t = e.target, d = t.dataset;
+  if(d.pna){ var p = findById(E.procs, d.pna); if(p){ p.na = t.checked; save(); estRefresh(); } return; }
+  if(d.pper){ var p2 = findById(E.procs, d.pper); if(p2){ p2.perUnit = t.checked; save(); estRefresh(); } return; }
+  if(d.xna){ var x = findById(E.exps, d.xna); if(x){ x.na = t.checked; save(); estRefresh(); } return; }
+  if(d.ptper){ var pt = findById(E.parts, d.ptper); if(pt){ pt.perUnit = t.checked; save(); estRefresh(); } return; }
+});
+
+
+/* 테스트용 노출 */
+window.__lm = {diag:diag, corr:corr, fieldResult:fieldResult, totals:function(){ return totals(ensureEst()); }, missing:function(){ return missingList(ensureEst()); }, state:function(){ return state; }};
+
+render();
+initCloud();
+})();
+</script>
+</body>
+</html>
