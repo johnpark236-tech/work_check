@@ -101,6 +101,10 @@ td.ng{color:var(--ng);font-weight:700}
 .modal .box{background:#fff;border-radius:16px;padding:18px;max-width:420px;width:100%}
 .modal .row{justify-content:flex-end;margin-top:14px}
 .hide{display:none!important}
+.frow{display:grid;grid-template-columns:1.15fr 1.25fr .7fr auto;gap:6px;margin-top:6px;align-items:center}
+.frow.hd{font-size:12px;color:var(--muted);margin-top:10px}
+.frow select,.frow input{width:100%;padding:9px 8px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:#fff;min-width:0}
+.frow .memo{grid-column:1 / -1;font-size:14px;padding:7px 8px;color:#374151}
 .lvgrid{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px 8px;align-items:start;margin-top:8px}
 .lvgrid .hd{font-size:13px;color:var(--muted);font-weight:700;text-align:center}
 .lvgrid .no{font-weight:800;padding-top:12px;font-size:15px}
@@ -1034,8 +1038,6 @@ var STD_PROCS = [
 ];
 var STD_EXPS = ['장비 임대 (지게차·리프트 등)', '공구·소모품', '출장비 (숙박·식대·교통)', '자재 운반비', '폐기물 처리'];
 var PART_PRESETS = [
-  {cat:'볼트', name:'육각볼트', spec:'M12×40'}, {cat:'너트', name:'육각너트', spec:'M12'},
-  {cat:'와셔', name:'평와셔', spec:'M12'}, {cat:'와셔', name:'스프링와셔', spec:'M12'},
   {cat:'앵커', name:'앵커볼트', spec:''}, {cat:'레벨링', name:'레벨링 풋', spec:'', auto:'feet'},
   {cat:'레벨링', name:'레벨링 풋 락너트', spec:'', auto:'feet'}, {cat:'소모품', name:'마킹 테이프', spec:''}
 ];
@@ -1051,6 +1053,9 @@ function ensureEst(){
       overhead:null, profit:null, vat:10, basis:'actual'
     };
   }
+  if(!state.est.comps) state.est.comps = [];
+  if(!state.est.prices) state.est.prices = {};
+  if(state.est.fSpare === undefined) state.est.fSpare = 5;
   return state.est;
 }
 function unitCount(){ return state.units.length || 1; }
@@ -1086,7 +1091,14 @@ function missingList(E){
   if(E.grades.some(function(g){ return num(g.rate) === null; })) m.push({t:'노임 단가 미입력 ('+E.grades.filter(function(g){ return num(g.rate)===null; }).map(function(g){ return g.name; }).join(', ')+')', go:'quote'});
   E.procs.forEach(function(p){ if(p.na) return; var c = procCost(E, p); if(c.mh === null) m.push({t:'공수 없음: '+p.name, go:'plan'}); });
   E.exps.forEach(function(x){ if(!x.na && num(x.amt) === null) m.push({t:'경비 없음: '+x.name, go:'quote'}); });
-  if(!E.parts.length) m.push({t:'파츠 리스트가 비어 있음', go:'parts'});
+  if(!E.parts.length && !E.comps.length) m.push({t:'파츠 리스트가 비어 있음', go:'parts'});
+  E.comps.forEach(function(c, i){
+    var nm = c.name || ('부품 '+(i+1));
+    if(num(c.qty) === null) m.push({t:'부품 수 없음: '+nm, go:'parts'});
+    if(!c.items.length) m.push({t:'체결 자재 없음: '+nm, go:'parts'});
+    c.items.forEach(function(it){ if(num(it.qty) === null) m.push({t:'개수 없음: '+nm+' — '+it.kind+' '+(it.spec||''), go:'parts'}); else if(!String(it.spec||'').trim()) m.push({t:'규격 없음: '+nm+' — '+it.kind, go:'parts'}); });
+  });
+  bom(E).forEach(function(b){ if(b.price === null) m.push({t:'단가 없음: '+b.kind+' '+b.spec, go:'parts'}); });
   E.parts.forEach(function(p){ if(partQty(p) === null) m.push({t:'수량 없음: '+p.name+(p.spec?' '+p.spec:''), go:'parts'}); else if(num(p.price) === null) m.push({t:'단가 없음: '+p.name+(p.spec?' '+p.spec:''), go:'parts'}); });
   if(num(E.overhead) === null) m.push({t:'일반관리비 % 미입력 (없으면 0)', go:'quote'});
   if(num(E.profit) === null) m.push({t:'이윤 % 미입력 (없으면 0)', go:'quote'});
@@ -1096,6 +1108,7 @@ function totals(E){
   var labor = 0, mat = 0, exp = 0, mh = 0;
   E.procs.forEach(function(p){ if(p.na) return; var c = procCost(E, p); if(c.cost) labor += c.cost; if(c.mh) mh += c.mh; });
   E.parts.forEach(function(p){ var a = partAmt(p); if(a) mat += a; });
+  bom(E).forEach(function(b){ if(b.amt) mat += b.amt; });
   E.exps.forEach(function(x){ if(!x.na && num(x.amt)) exp += num(x.amt); });
   var direct = labor + mat + exp, oh = direct*(num(E.overhead)||0)/100, pf = (direct+oh)*(num(E.profit)||0)/100;
   var supply = Math.floor((direct + oh + pf)/1000)*1000, vat = Math.round(supply*(num(E.vat)||0)/100);
@@ -1169,8 +1182,78 @@ function estLog(E){
   return h;
 }
 
+var F_KINDS = ['육각볼트','렌치볼트','접시볼트','세트스크류','스터드볼트','너트','평와셔','스프링와셔','앵커','기타'];
+var F_SPECS = ['M4×10','M5×12','M6×12','M6×16','M8×16','M8×20','M8×25','M10×20','M10×25','M10×30','M12×30','M12×40','M16×40','M16×50','M20×60','M6','M8','M10','M12','M16','M20'];
+function isBolt(k){ return /볼트|스크류/.test(k||''); }
+function sizeOf(spec){ var m = String(spec||'').match(/M\s?\d+(\.\d+)?/i); return m ? m[0].toUpperCase().replace(/\s/g,'') : ''; }
+function compMult(c){ var q = num(c.qty); if(q === null) return null; return q * (c.perUnit === false ? 1 : unitCount()); }
+function bomKey(it){ return (it.kind||'') + '|' + String(it.spec||'').trim(); }
+function bom(E){
+  var map = {}, order = [];
+  (E.comps||[]).forEach(function(c){
+    var m = compMult(c);
+    c.items.forEach(function(it){
+      var k = bomKey(it);
+      if(!map[k]){ map[k] = {key:k, kind:it.kind, spec:String(it.spec||'').trim(), raw:0, ok:true, from:[]}; order.push(k); }
+      var q = num(it.qty);
+      if(q === null || m === null){ map[k].ok = false; return; }
+      map[k].raw += q * m;
+      if(map[k].from.indexOf(c.name) < 0) map[k].from.push(c.name);
+    });
+  });
+  return order.map(function(k){
+    var b = map[k];
+    b.qty = Math.ceil(b.raw * (1 + (num(E.fSpare)||0)/100) - 1e-9);
+    b.price = num((E.prices||{})[k]);
+    b.amt = b.price === null ? null : b.qty * b.price;
+    return b;
+  });
+}
+function compTotal(c){ var m = compMult(c); if(m === null) return null; var t = 0; c.items.forEach(function(it){ t += (num(it.qty)||0) * m; }); return t; }
+function newItem(kind, spec, qty, grp){ return {id:uid(), kind:kind, spec:spec||'', qty:qty===undefined?null:qty, memo:'', grp:grp||null, follow:!!grp}; }
+
+function itemRow(c, it){
+  var ref = c.id+'|'+it.id;
+  return '<div class="frow" id="it-'+it.id+'">'
+    + '<select data-ci="'+ref+'" data-ik="kind">'+F_KINDS.map(function(k){ return '<option'+(k===it.kind?' selected':'')+'>'+k+'</option>'; }).join('')+'</select>'
+    + '<input list="fspecs" data-ci="'+ref+'" data-ik="spec" value="'+esc(it.spec)+'" placeholder="M12×40" id="sp-'+it.id+'">'
+    + '<input inputmode="decimal" data-ci="'+ref+'" data-ik="qty" value="'+(it.qty===null||it.qty===undefined?'':it.qty)+'" placeholder="개" id="qt-'+it.id+'">'
+    + '<button class="btn sec sm" data-idel="'+ref+'" style="min-height:40px;padding:6px 10px">×</button>'
+    + '<input class="memo" data-ci="'+ref+'" data-ik="memo" value="'+esc(it.memo||'')+'" placeholder="탭 위치·메모 (예: 상부 탭 4곳, SUS)">'
+    + '</div>';
+}
+function compCard(E, c, i){
+  var t = compTotal(c), m = compMult(c);
+  var h = '<div class="field" id="cp-'+c.id+'"><div class="grid2"><div><label>부품명 '+(i+1)+'</label>'+inp('data-cc="'+c.id+'" data-ck="name"', c.name, '예: 모듈 연결 브라켓')+'</div>'
+    + '<div><label>'+(c.perUnit===false?'전체 부품 수':'호기당 부품 수')+'</label>'+inp('inputmode="decimal" data-cc="'+c.id+'" data-ck="qty"', c.qty, '예: 2')+'</div></div>';
+  h += '<div class="frow hd"><span>종류</span><span>규격</span><span>개/부품</span><span></span></div>';
+  h += c.items.map(function(it){ return itemRow(c, it); }).join('');
+  if(!c.items.length) h += '<div class="muted" style="margin:6px 0">아래 버튼으로 이 부품에 들어가는 볼트·너트를 추가하세요.</div>';
+  h += '<div class="rounds"><button data-iadd="'+c.id+'|set">+ 볼트·너트·와셔 세트</button><button data-iadd="'+c.id+'|bolt">+ 볼트 (탭 체결)</button><button data-iadd="'+c.id+'|nut">+ 너트</button><button data-iadd="'+c.id+'|etc">+ 기타</button></div>';
+  h += '<div class="row" style="justify-content:space-between;margin-top:8px"><span class="muted" id="ct-'+c.id+'">'+(m===null?'부품 수를 넣으세요':'부품 '+fmt(m,0)+'개 × 체결 자재 → 총 '+fmt(t,0)+'개 (여유 전)')+'</span>'
+    + '<span class="row" style="gap:6px"><label class="row" style="font-size:13px;gap:4px"><input type="checkbox" data-cper="'+c.id+'"'+(c.perUnit===false?'':' checked')+' style="width:18px;height:18px">호기당</label><button class="btn sec sm" data-ccopy="'+c.id+'">복사</button><button class="btn sec sm" data-cdel="'+c.id+'">삭제</button></span></div></div>';
+  return h;
+}
+function bomTable(E){
+  var B = bom(E);
+  if(!B.length) return '<div class="muted">부품에 체결 자재를 넣으면 규격별로 합쳐집니다.</div>';
+  var sum = 0;
+  var h = '<table><tr><th>종류·규격</th><th>총수량</th><th>단가</th><th>금액</th></tr>';
+  B.forEach(function(b){
+    if(b.amt) sum += b.amt;
+    h += '<tr><td><b>'+esc(b.kind)+'</b> '+esc(b.spec||'(규격 없음)')+'<br><span class="muted" style="font-size:11px">'+esc(b.from.join(', '))+'</span></td><td>'+(b.ok?fmt(b.qty,0):'<span style="color:var(--ng)">수량 빠짐</span>')+'</td>'
+      + '<td><input inputmode="numeric" data-pr="'+esc(b.key)+'" value="'+(b.price===null?'':b.price)+'" placeholder="원" style="width:80px;padding:6px;border:1px solid var(--line);border-radius:8px;text-align:right"></td><td>'+won(b.amt)+'</td></tr>';
+  });
+  return h + '<tr><th>체결 자재 합계</th><th></th><th></th><th>'+won(sum)+'</th></tr></table>';
+}
+
 function estParts(E){
-  var h = '<div class="card"><h2>파츠 리스트</h2><div class="muted">수량은 호기당 기준 → 호기 수('+unitCount()+'대)와 여유율을 곱해 총수량을 올림 계산합니다. 레벨링 풋·락너트는 레벨링 발 개수와 연동됩니다.</div>';
+  var h = '<datalist id="fspecs">'+F_SPECS.map(function(x){ return '<option value="'+x+'">'; }).join('')+'</datalist>';
+  h += '<div class="card"><h2>부품별 체결 자재</h2><div class="muted">부품 하나에 탭(체결 위치)이 여러 개면 위치마다 볼트 종류·규격을 따로 넣으세요. 세트로 넣으면 너트·와셔가 볼트 개수와 규격(M 크기)을 따라갑니다. 총수량 = 개/부품 × 부품 수 × 호기 수('+unitCount()+'대) × (1 + 여유율).</div></div>';
+  (E.comps||[]).forEach(function(c, i){ h += '<div class="card" style="padding:4px 14px 12px">' + compCard(E, c, i) + '</div>'; });
+  h += '<button class="btn" style="width:100%;margin-bottom:12px" id="compAdd">+ 부품 추가</button>';
+  h += '<div class="card"><h2>체결 자재 집계 (발주용)</h2><div class="row f"><label class="muted">여유율 %</label><input inputmode="decimal" data-fspare="1" value="'+(E.fSpare===null||E.fSpare===undefined?'':E.fSpare)+'" style="width:80px;padding:8px;border:1px solid var(--line);border-radius:10px"></div><div id="bomBox" style="margin-top:8px">'+bomTable(E)+'</div></div>';
+  h += '<div class="card"><h2>기타 자재</h2><div class="muted">레벨링 풋·락너트(발 개수 연동), 앵커, 소모품 등 부품에 딸리지 않는 자재.</div>';
   h += '<div class="muted" style="margin-top:8px">빠른 추가</div><div class="rounds">' + PART_PRESETS.map(function(p, i){ return '<button data-padd="'+i+'">+ '+esc(p.name)+(p.spec?' '+esc(p.spec):'')+'</button>'; }).join('') + '<button data-padd="-1">+ 직접 입력</button></div></div>';
   var cats = {};
   E.parts.forEach(function(p){ (cats[p.cat||'기타'] = cats[p.cat||'기타'] || []).push(p); });
@@ -1189,7 +1272,7 @@ function estParts(E){
     h += '</div>';
   });
   var T = totals(E);
-  h += '<div class="card"><b>자재비 합계 '+won(T.mat)+' 원</b><div class="row" style="margin-top:8px"><button class="btn sm" id="partsCsv">파츠 리스트 CSV 저장</button><button class="btn sec sm" id="partsCopy">텍스트 복사</button></div></div>';
+  h += '<div class="card"><b id="matTotal">자재비 합계 (체결 자재 + 기타) '+won(T.mat)+' 원</b><div class="row" style="margin-top:8px"><button class="btn sm" id="partsCsv">파츠 리스트 CSV 저장</button><button class="btn sec sm" id="partsCopy">텍스트 복사</button></div></div>';
   return h;
 }
 
@@ -1218,6 +1301,7 @@ function quoteHtml(E, T){
   E.procs.forEach(function(p){ if(p.na) return; var c = procCost(E, p); h += '<tr><td>'+esc(p.name)+' <span style="color:#6b7280;font-size:11px">'+c.src+'</span></td><td>'+fmt(c.mh,1)+'</td><td>'+fmt(c.md,2)+'</td><td>'+won(c.rate)+'</td><td>'+won(c.cost)+'</td></tr>'; });
   h += '<tr><th>소계</th><th>'+fmt(T.mh,1)+'</th><th>'+fmt(T.md,2)+'</th><th></th><th>'+won(T.labor)+'</th></tr></table>';
   h += '<h3>2. 자재비</h3><table><tr><th>품명·규격</th><th>수량</th><th>단가</th><th>금액</th></tr>';
+  bom(E).forEach(function(b){ h += '<tr><td>'+esc(b.kind)+' '+esc(b.spec)+'</td><td>'+fmt(b.qty,0)+' EA</td><td>'+won(b.price)+'</td><td>'+won(b.amt)+'</td></tr>'; });
   E.parts.forEach(function(p){ var q = partQty(p); h += '<tr><td>'+esc(p.name)+' '+esc(p.spec||'')+'</td><td>'+(q===null?'—':fmt(q,0)+' '+esc(p.unit||'EA'))+'</td><td>'+won(num(p.price))+'</td><td>'+won(partAmt(p))+'</td></tr>'; });
   h += '<tr><th>소계</th><th></th><th></th><th>'+won(T.mat)+'</th></tr></table>';
   h += '<h3>3. 경비</h3><table>';
@@ -1229,6 +1313,7 @@ function quoteHtml(E, T){
 function quoteRows(E){
   var T = totals(E), r = [['구분','항목','수량/공수','단위','단가','금액','비고']];
   E.procs.forEach(function(p){ if(p.na){ r.push(['노무비', p.name, '', '', '', '', '해당 없음']); return; } var c = procCost(E, p); r.push(['노무비', p.name, c.md===null?'':String(Math.round(c.md*100)/100), '인·일', c.rate===null||c.rate===undefined?'':String(c.rate), c.cost===null?'':String(Math.round(c.cost)), c.src+(c.mh!==null?' '+Math.round(c.mh*10)/10+'MH':'')]); });
+  bom(E).forEach(function(b){ r.push(['자재비', b.kind+' '+b.spec, String(b.qty), 'EA', b.price===null?'':String(b.price), b.amt===null?'':String(Math.round(b.amt)), b.from.join(' / ')]); });
   E.parts.forEach(function(p){ var q = partQty(p), a = partAmt(p); r.push(['자재비', p.name+' '+(p.spec||''), q===null?'':String(q), p.unit||'EA', p.price===null||p.price===undefined?'':String(p.price), a===null?'':String(Math.round(a)), p.cat||'']); });
   E.exps.forEach(function(x){ r.push(['경비', x.name, '', '', '', x.na?'':String(num(x.amt)===null?'':num(x.amt)), x.na?'해당 없음':'']); });
   r.push(['합계','직접비','','','',String(Math.round(T.direct)),'']);
@@ -1240,7 +1325,12 @@ function quoteRows(E){
   return r;
 }
 function partRows(E){
-  var r = [['분류','품명','규격','단위','호기당 수량','호기 수','여유율%','총수량','단가','금액']];
+  var r = [['[부품별 체결 자재]','','','','','',''],['부품','부품 수','호기당','종류','규격','개/부품','탭 위치·메모']];
+  E.comps.forEach(function(c){ c.items.forEach(function(it){ r.push([c.name, c.qty===null||c.qty===undefined?'':String(c.qty), c.perUnit===false?'아니오':'예', it.kind, it.spec||'', it.qty===null||it.qty===undefined?'':String(it.qty), it.memo||'']); }); if(!c.items.length) r.push([c.name, String(c.qty||''), '', '(체결 자재 없음)', '', '', '']); });
+  r.push([]); r.push(['[체결 자재 집계] 여유율 '+(num(E.fSpare)||0)+'%','','','','','','']); r.push(['종류','규격','총수량','단가','금액','사용 부품','']);
+  bom(E).forEach(function(b){ r.push([b.kind, b.spec, String(b.qty), b.price===null?'':String(b.price), b.amt===null?'':String(Math.round(b.amt)), b.from.join(' / '), '']); });
+  r.push([]); r.push(['[기타 자재]','','','','','','']);
+  r.push(['분류','품명','규격','단위','호기당 수량','호기 수','여유율%','총수량','단가','금액']);
   E.parts.forEach(function(p){ var q = partQty(p), a = partAmt(p); r.push([p.cat||'', p.name, p.spec||'', p.unit||'EA', p.auto==='feet'?'발 개수 연동':(p.qty===null||p.qty===undefined?'':String(p.qty)), p.perUnit===false?'1':String(unitCount()), String(num(p.spare)||0), q===null?'':String(q), p.price===null||p.price===undefined?'':String(p.price), a===null?'':String(Math.round(a))]); });
   return r;
 }
@@ -1260,13 +1350,36 @@ function quoteFile(E){
   return '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>견적서 '+esc(E.project.name||'')+'</title><style>body{font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;max-width:760px;margin:24px auto;padding:0 16px;color:#111}table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}th,td{border:1px solid #999;padding:5px 6px;text-align:right}th:first-child,td:first-child{text-align:left}th{background:#f3f4f6}h3{margin:16px 0 4px}@media print{body{margin:0}}</style></head><body>'+quoteHtml(E, T)+'<p style="font-size:12px;color:#555;margin-top:16px">공수 기준: '+(E.basis==='actual'?'작업 실적 우선 (실적 없는 작업은 계획)':'계획')+' · 1일 '+E.hpd+'시간</p></body></html>';
 }
 
+function compLive(E, c){
+  var el = document.getElementById('ct-'+c.id), m = compMult(c), t = compTotal(c);
+  if(el) el.textContent = m===null ? '부품 수를 넣으세요' : '부품 '+fmt(m,0)+'개 × 체결 자재 → 총 '+fmt(t,0)+'개 (여유 전)';
+  var bb = document.getElementById('bomBox'); if(bb) bb.innerHTML = bomTable(E);
+}
 function estRefresh(){ var y = window.scrollY; renderEst(); window.scrollTo(0, y); }
 function findById(arr, id){ return arr.filter(function(x){ return x.id === id; })[0]; }
 
 main.addEventListener('click', function(e){
   if(state.tab !== 'est') return;
-  var E = ensureEst(), t = e.target.closest('[data-esub],[data-padd],[data-ptdel],[data-pdel],[data-ldel],[data-xdel],[data-ebasis],[data-ego],#procAdd,#gradeAdd,#logAdd,#expAdd,#partsCsv,#partsCopy,#quoteSave,#quoteCsv,#quoteCopy');
+  var E = ensureEst(), t = e.target.closest('#compAdd,[data-cdel],[data-ccopy],[data-iadd],[data-idel],[data-esub],[data-padd],[data-ptdel],[data-pdel],[data-ldel],[data-xdel],[data-ebasis],[data-ego],#procAdd,#gradeAdd,#logAdd,#expAdd,#partsCsv,#partsCopy,#quoteSave,#quoteCsv,#quoteCopy');
   if(!t) return;
+  if(t.id === 'compAdd'){ E.comps.push({id:uid(), name:'', qty:null, perUnit:true, items:[]}); save(); estRefresh(); return; }
+  if(t.dataset.cdel){ var cd = findById(E.comps, t.dataset.cdel); confirmBox(esc((cd&&cd.name)||'이 부품')+'과 체결 자재를 삭제할까요?', function(){ E.comps = E.comps.filter(function(c){ return c.id !== t.dataset.cdel; }); save(); estRefresh(); }); return; }
+  if(t.dataset.ccopy){
+    var src = findById(E.comps, t.dataset.ccopy); if(!src) return;
+    var gm = {}, cp = JSON.parse(JSON.stringify(src)); cp.id = uid(); cp.name = (src.name||'부품')+' (복사)';
+    cp.items.forEach(function(it){ it.id = uid(); if(it.grp){ gm[it.grp] = gm[it.grp] || uid(); it.grp = gm[it.grp]; } });
+    E.comps.splice(E.comps.indexOf(src)+1, 0, cp); save(); estRefresh(); toast('부품 복사'); return;
+  }
+  if(t.dataset.iadd){
+    var pa = t.dataset.iadd.split('|'), c = findById(E.comps, pa[0]); if(!c) return;
+    var last = c.items.filter(function(x){ return isBolt(x.kind); }).slice(-1)[0], sz = last ? sizeOf(last.spec) : '';
+    if(pa[1] === 'set'){ var g = uid(); c.items.push(newItem('육각볼트', '', null, g)); c.items[c.items.length-1].follow = false; c.items.push(newItem('너트', '', null, g)); c.items.push(newItem('평와셔', '', null, g)); c.items.push(newItem('스프링와셔', '', null, g)); }
+    else if(pa[1] === 'bolt') c.items.push(newItem('육각볼트', ''));
+    else if(pa[1] === 'nut') c.items.push(newItem('너트', sz));
+    else c.items.push(newItem('기타', ''));
+    save(); estRefresh(); return;
+  }
+  if(t.dataset.idel){ var pd = t.dataset.idel.split('|'), cc = findById(E.comps, pd[0]); if(cc){ cc.items = cc.items.filter(function(x){ return x.id !== pd[1]; }); save(); estRefresh(); } return; }
   if(t.dataset.esub){ E.sub = t.dataset.esub; save(); renderEst(); window.scrollTo(0,0); return; }
   if(t.dataset.ego){ E.sub = t.dataset.ego; save(); renderEst(); window.scrollTo(0,0); return; }
   if(t.dataset.ebasis){ E.basis = t.dataset.ebasis; save(); estRefresh(); return; }
@@ -1300,6 +1413,7 @@ function estLive(){
   var k = document.querySelectorAll('.kpi div b');
   if(k.length >= 3){ k[0].textContent = fmt(T.md,1); k[1].textContent = won(T.total/10000); k[2].textContent = miss.length; k[2].parentNode.className = miss.length?'ng':'ok'; }
   var q = document.getElementById('quoteDoc'); if(q) q.innerHTML = quoteHtml(E, T);
+  var mt = document.getElementById('matTotal'); if(mt) mt.textContent = '자재비 합계 (체결 자재 + 기타) '+won(T.mat)+' 원';
 }
 main.addEventListener('input', function(e){
   if(state.tab !== 'est') return;
@@ -1314,6 +1428,18 @@ main.addEventListener('input', function(e){
     var el = document.getElementById('pq-'+pt.id), q = partQty(pt); if(el) el.textContent = '총 '+(q===null?'—':fmt(q,0)+' '+(pt.unit||'EA'))+' · '+won(partAmt(pt))+' 원'; }
   else if(d.xx){ var x = findById(E.exps, d.xx); if(!x) return; x[d.xk] = d.xk==='name' ? t.value : num(t.value); }
   else if(d.er){ E[d.er] = num(t.value); }
+  else if(d.cc){ var c = findById(E.comps, d.cc); if(!c) return; c[d.ck] = d.ck==='name' ? t.value : num(t.value); compLive(E, c); }
+  else if(d.ci){
+    var pr = d.ci.split('|'), c2 = findById(E.comps, pr[0]); if(!c2) return; var it = findById(c2.items, pr[1]); if(!it) return;
+    if(d.ik === 'qty'){ it.qty = num(t.value); if(it.grp && !isBolt(it.kind)) it.follow = false; }
+    else { it[d.ik] = t.value; if(d.ik === 'spec' && it.grp && !isBolt(it.kind)) it.follow = false; }
+    if(it.grp && isBolt(it.kind) && (d.ik === 'qty' || d.ik === 'spec')){
+      c2.items.forEach(function(o){ if(o.grp === it.grp && o !== it && o.follow){ o.qty = it.qty; o.spec = sizeOf(it.spec); var qe = document.getElementById('qt-'+o.id), se = document.getElementById('sp-'+o.id); if(qe) qe.value = o.qty===null?'':o.qty; if(se) se.value = o.spec; } });
+    }
+    compLive(E, c2);
+  }
+  else if(d.pr !== undefined){ E.prices[d.pr] = num(t.value); var tr = t.closest('tr'), b = bom(E).filter(function(x){ return x.key === d.pr; })[0]; if(tr && b){ tr.cells[3].textContent = won(b.amt); var sm = 0; bom(E).forEach(function(x){ if(x.amt) sm += x.amt; }); var lt = tr.parentNode.lastElementChild; if(lt) lt.cells[3].textContent = won(sm); } }
+  else if(d.fspare){ E.fSpare = num(t.value); var bb = document.getElementById('bomBox'); if(bb) bb.innerHTML = bomTable(E); }
   else return;
   save(); estLive();
 });
@@ -1323,6 +1449,7 @@ main.addEventListener('change', function(e){
   if(d.pna){ var p = findById(E.procs, d.pna); if(p){ p.na = t.checked; save(); estRefresh(); } return; }
   if(d.pper){ var p2 = findById(E.procs, d.pper); if(p2){ p2.perUnit = t.checked; save(); estRefresh(); } return; }
   if(d.xna){ var x = findById(E.exps, d.xna); if(x){ x.na = t.checked; save(); estRefresh(); } return; }
+  if(d.cper){ var cpu = findById(E.comps, d.cper); if(cpu){ cpu.perUnit = t.checked; save(); estRefresh(); } return; }
   if(d.ptper){ var pt = findById(E.parts, d.ptper); if(pt){ pt.perUnit = t.checked; save(); estRefresh(); } return; }
 });
 
