@@ -101,6 +101,15 @@ td.ng{color:var(--ng);font-weight:700}
 .modal .box{background:#fff;border-radius:16px;padding:18px;max-width:420px;width:100%}
 .modal .row{justify-content:flex-end;margin-top:14px}
 .hide{display:none!important}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+.pgrid button{border:2px solid var(--line);background:#fff;border-radius:12px;padding:8px 4px;text-align:center;position:relative;min-height:64px}
+.pgrid button i{position:absolute;left:6px;top:4px;font-style:normal;font-size:11px;color:var(--muted);font-weight:700}
+.pgrid button b{display:block;font-size:15px;margin-top:6px}
+.pgrid button span{font-size:12px;color:var(--muted);font-weight:600}
+.pgrid button.ok{border-color:var(--ok)}.pgrid button.ok span{color:var(--ok)}
+.pgrid button.ng{border-color:var(--ng)}.pgrid button.ng span{color:var(--ng)}
+.pgrid button.part span{color:var(--warn)}
+.pgrid button.on{background:var(--pri);border-color:var(--pri)}.pgrid button.on b,.pgrid button.on span,.pgrid button.on i{color:#fff}
 .frow{display:grid;grid-template-columns:1.15fr 1.25fr .7fr auto;gap:6px;margin-top:6px;align-items:center}
 .frow.hd{font-size:12px;color:var(--muted);margin-top:10px}
 .frow select,.frow input{width:100%;padding:9px 8px;border:1px solid var(--line);border-radius:10px;font-size:16px;background:#fff;min-width:0}
@@ -157,18 +166,14 @@ var LS_PHOTO = 'linemark-photos-v1';
 
 function defaultUnit(name, note, sched){
   return {id: 'u' + Math.random().toString(36).slice(2,8), name:name, note:note||'', sched:sched||'',
-    L:7430, W:1462, X:500, Y:null, P1:null, P2:null, ports:'',
-    meas:{}, checks:{}, worker:'', checker:'', done:null};
+    L:null, W:null, X:null, Y:null, P1:null, P2:null, ports:'',
+    meas:{}, checks:{}, notes:{}, asm:{}, worker:'', checker:'', done:null};
 }
 function defaultState(){
   return {
     v:1, savedAt:0,
-    settings:{offset:100, tolOuter:3, tolDiag:5, worker:'', presets:[{name:'N2 Stocker', L:7430, W:1462}]},
-    units:[
-      defaultUnit('#117','14열 7단','11/11~01/19'),
-      defaultUnit('#115','14열 7단','11/04~01/12'),
-      defaultUnit('#116','14열 7단','11/04~01/12')
-    ],
+    settings:{offset:100, tolOuter:3, tolDiag:5, worker:'', presets:[]},
+    units:[], setupDone:false, recv:{}, extraChecks:{},
     cur:{unit:0, step:0}, tab:'work'
   };
 }
@@ -177,7 +182,11 @@ var state = loadLocal() || defaultState();
 var photos = loadPhotos();
 if(state.tab === 'level') state.tab = 'work';
 state.units.forEach(function(u){ if(u.lev && u.lev.checks){ ['lk1','lk2','lk3'].forEach(function(k){ if(u.lev.checks[k]) u.checks[k] = true; }); } });
-if(!state.settings.presets) state.settings.presets = [{name:'N2 Stocker', L:7430, W:1462}];
+if(!state.settings.presets) state.settings.presets = [];
+if(state.setupDone === undefined) state.setupDone = state.units.some(function(u){ return u.L > 0; });
+if(!state.recv) state.recv = {};
+if(!state.extraChecks) state.extraChecks = {};
+state.units.forEach(function(u){ if(!u.notes) u.notes = {}; if(!u.asm) u.asm = {}; });
 
 function loadLocal(){
   try{ var s = localStorage.getItem(LS_KEY); if(s){ var o = JSON.parse(s); if(o && o.units) return o; } }catch(e){}
@@ -263,6 +272,7 @@ function esc(s){ return String(s===null||s===undefined?'':s).replace(/[&<>"']/g,
 
 /* 직각 삼각형 3:4:5 — 설비 크기에 맞춰 자동 선택 */
 function tri(u){
+  if(!(u.L > 0 && u.W > 0)) return {k:300, a:900, b:1200, c:1500};
   var ks = [300,250,200,150,100,50,25], k = 25;
   for(var i=0;i<ks.length;i++){ if(3*ks[i] <= u.W*0.95 && 4*ks[i] <= u.L*0.5){ k = ks[i]; break; } }
   return {k:k, a:3*k, b:4*k, c:5*k};
@@ -270,10 +280,16 @@ function tri(u){
 function sizeOk(u){ return u.L > 0 && u.W > 0; }
 
 /* ---------- 작업 단계 ---------- */
+function xChecks(ph, base){ return base.concat((state.extraChecks[ph]||[])); }
 function steps(u){
   var S = state.settings, D = diag(u.L, u.W), tr = tri(u);
   return [
-    {key:'A', title:'시작점 A 잡기', hl:['refX','refY','X','Y','A'],
+    {key:'IN', phase:'in', title:'자재 입고', hl:[], recv:true,
+     how:['견적 탭 파츠에 등록한 부품·볼트·너트·기타 자재가 필요 수량으로 나옵니다.', '받은 수량을 넣으면 부족분을 바로 보여줍니다. (공사 전체 공통)']},
+    {key:'QC', phase:'qc', title:'입고 검수', hl:[], notes:true,
+     how:['입고 자재를 하나씩 확인하고, 불량·오배송은 아래 메모에 남긴다.'],
+     checks:xChecks('qc', [{k:'qc1', t:'수량이 입고 화면과 일치 (부족분 없음)'},{k:'qc2', t:'외관 손상·녹·찍힘 없음'},{k:'qc3', t:'볼트·너트 규격·재질 일치 (도면 대조)'},{k:'qc4', t:'성적서·거래명세서 확인'},{k:'qc5', t:'불량품 분리 보관·보고'}])},
+    {key:'A', phase:'mark', title:'시작점 A 잡기', hl:['refX','refY','X','Y','A'],
      how:['A = 본체 외곽의 HP측·전면(포트측) 모서리. 커버 끝이 아님.',
           '고정자: 기준선 X에 줄자 기점을 대고 "기점 OK".',
           '측정자: 아래 눈금에 십자(+) 표시. 기준선 Y도 같은 방법.',
@@ -333,17 +349,49 @@ function steps(u){
              {k:'GB', label:'B 모서리 틈 (폭 방향)', target:0, raw:true},
              {k:'GL', label:'HP 끝 ↔ A점선 (길이 방향)', target:0, raw:true}],
      checks:[{k:'ps1', t:'HP → OP 방향이 표시와 일치'},{k:'ps2', t:'하부 포트가 표시 위치에 맞음'}]},
+    {key:'ASM', phase:'asm', title:'조립·체결 (부품별 볼트·너트)', hl:[], asm:true,
+     how:['부품마다 필요한 볼트·너트·와셔와 이 호기 수량이 나옵니다.', '체결이 끝나면 "체결", 토크 확인 후 "토크"를 체크.', '부품과 체결 자재는 견적 탭 → 파츠에서 등록합니다.']},
     {key:'LEV', phase:'level', title:'레벨링', hl:[], level:true,
      how:['발마다 높이를 넣으면 올리고 내릴 양과 회전수가 바로 나옵니다.']},
     {key:'LK', phase:'level', title:'락너트·고정', hl:[],
      how:['레벨 OK가 나온 뒤 락너트를 체결한다.', '체결하면서 레벨이 바뀔 수 있으니 한 번 더 잰다 (레벨링 단계에서 새 회차).'],
      checks:[{k:'lk1', t:'락너트 전부 체결'},{k:'lk2', t:'체결 후 재측정 — 레벨 OK 유지'},{k:'lk3', t:'앵커·고정 (해당 시)'}]},
-    {key:'OK', phase:'done', title:'최종 완료', hl:['all'], done:true,
-     how:['라인마킹·위치·레벨링 요약에 NG가 없는지 확인하고 확인자 서명.']}
+    {key:'SU', phase:'setup', title:'셋업', hl:[], notes:true,
+     how:['유틸리티 연결과 동작 확인. 현장에 맞는 항목은 아래에서 추가하세요.'],
+     checks:xChecks('setup', [{k:'su1', t:'전원 연결·절연 확인'},{k:'su2', t:'에어·N2 배관 연결, 누설 확인'},{k:'su3', t:'통신·I/O 체크'},{k:'su4', t:'원점·티칭'},{k:'su5', t:'인터락·비상정지 동작'},{k:'su6', t:'도어·센서 동작'}])},
+    {key:'ST', phase:'stab', title:'안정화', hl:[], notes:true, runlog:true,
+     how:['연속 운전으로 이상이 없는지 확인하고 알람·조치 내용을 남긴다.'],
+     checks:xChecks('stab', [{k:'st1', t:'연속 운전 완료'},{k:'st2', t:'반송·동작 반복 테스트'},{k:'st3', t:'알람·에러 이력 확인·조치'},{k:'st4', t:'이상 발생 내용 정리'}])},
+    {key:'FN', phase:'final', title:'최종 검수·인계', hl:[], notes:true,
+     how:['고객 입회 검수와 서류 제출, 미결 사항 정리.'],
+     checks:xChecks('final', [{k:'fn1', t:'고객 입회 검수'},{k:'fn2', t:'체크시트·성적서 제출'},{k:'fn3', t:'미결 사항(펀치) 정리'},{k:'fn4', t:'현장 정리·청소'}])},
+    {key:'OK', phase:'final', title:'완료 서명', hl:['all'], done:true,
+     how:['전 공정 요약에 NG·미완료가 없는지 확인하고 확인자 서명.']}
   ];
 }
-var PHASES = [{id:'mark', t:'라인마킹'},{id:'pos', t:'위치 맞춤'},{id:'level', t:'레벨링'},{id:'done', t:'완료'}];
+var PHASES = [{id:'in', t:'자재 입고'},{id:'qc', t:'입고 검수'},{id:'mark', t:'라인마킹'},{id:'pos', t:'반입·위치'},{id:'asm', t:'조립·체결'},{id:'level', t:'레벨링'},{id:'setup', t:'셋업'},{id:'stab', t:'안정화'},{id:'final', t:'최종 검수'}];
 function phaseOf(st){ return st.phase || 'mark'; }
+var FLOW_OF = {'in':'in','qc':'qc','mark':'mark','pos':'pos','asm':'asm','level':'lev','setup':'setup','stab':'stab','final':'final'};
+/* 자재 입고: 필요 목록 (공사 전체) */
+function recvList(){
+  var E = ensureEst(), L = [];
+  E.comps.forEach(function(c, i){ var m = compMult(c); L.push({key:'c:'+c.id, name:(c.name||('부품 '+(i+1))), sub:'부품', need:m}); });
+  bom(E).forEach(function(b){ L.push({key:'b:'+b.key, name:b.kind+' '+b.spec, sub:'체결 자재', need:b.ok?b.qty:null}); });
+  E.parts.forEach(function(p){ L.push({key:'p:'+p.id, name:p.name+(p.spec?' '+p.spec:''), sub:p.cat||'기타', need:partQty(p)}); });
+  return L;
+}
+function recvStatus(){
+  var L = recvList(); if(!L.length) return '';
+  var any = false, short = false;
+  L.forEach(function(x){ var g = num(state.recv[x.key]); if(g !== null) any = true; if(x.need !== null && (g === null || g < x.need)) short = true; });
+  return !short ? 'ok' : (any ? 'part' : '');
+}
+function asmStatus(u){
+  var E = ensureEst(); if(!E.comps.length) return '';
+  var done = 0, any = false;
+  E.comps.forEach(function(c){ var a = u.asm[c.id] || {}; if(a.done || a.tq) any = true; if(a.done && a.tq) done++; });
+  return done === E.comps.length ? 'ok' : (any ? 'part' : '');
+}
 
 /* 판정 */
 function fieldResult(u, f){
@@ -373,6 +421,8 @@ function levLast(u){
   return r;
 }
 function stepStatus(u, st){
+  if(st.recv) return recvStatus();
+  if(st.asm) return asmStatus(u);
   if(st.level){ var lr = levLast(u); if(!lr) return ''; if(lr.ok) return 'ok'; return lr.count < lr.total ? 'part' : 'ng'; }
   if(st.fields && st.checks){
     var fs = stepStatus(u, {fields:st.fields}), cs = stepStatus(u, {checks:st.checks});
@@ -459,34 +509,96 @@ function render(){
 
 function unitChips(){
   return '<div class="chips">' + state.units.map(function(u, i){
-    var p = unitProgress(u);
-    return '<button class="chip'+(i===state.cur.unit?' on':'')+(u.done?' done':'')+'" data-unit="'+i+'"><b>'+esc(u.name)+'</b><span>'+(u.done?'완료':p.ok+'/'+p.total+' 단계')+(p.ng?' · NG '+p.ng:'')+'</span></button>';
+    var p = unitProgress(u), ss = steps(u), okP = PHASES.filter(function(P){ return phaseBadge(u, ss, P).cls === 'ok'; }).length;
+    return '<button class="chip'+(i===state.cur.unit?' on':'')+(u.done?' done':'')+'" data-unit="'+i+'"><b>'+esc(u.name)+'</b><span>'+(u.done?'완료':'공정 '+okP+'/'+PHASES.length)+(p.ng?' · NG '+p.ng:'')+'</span></button>';
   }).join('') + '</div>';
 }
 
+function wizardHtml(){
+  var E = ensureEst();
+  return '<div class="card"><h2>처음 설정</h2><div class="muted">공사와 설비 정보를 먼저 입력하세요. 가로·세로는 라인마킹의 기준 치수가 되고, 나중에 설비 탭에서 바꿀 수 있습니다.</div>'
+    + '<div class="f"><label>공사명</label><input id="wzProj" value="'+esc(E.project.name||'')+'" placeholder="예: 3층 N2 Stocker 설치"></div>'
+    + '<div class="f"><label>설비 종류</label><input id="wzKind" placeholder="예: N2 Stocker"></div>'
+    + '<div class="grid2 f"><div><label>가로 = 길이 L (mm)</label><input id="wzL" inputmode="decimal" placeholder="도면 치수"></div><div><label>세로 = 폭 W (mm)</label><input id="wzW" inputmode="decimal" placeholder="도면 치수"></div></div>'
+    + '<div class="f"><label>호기 이름 (쉼표로 구분)</label><input id="wzUnits" placeholder="예: #117, #115, #116"></div>'
+    + '<div class="f"><label>기준선 X → A점 거리 (mm, 모르면 비움)</label><input id="wzX" inputmode="decimal"></div>'
+    + '<button class="btn" style="width:100%;margin-top:14px" id="wzGo">시작하기</button></div>';
+}
+function phaseBadge(u, ss, ph){
+  var idx = ss.map(function(x, i){ return phaseOf(x) === ph.id ? i : -1; }).filter(function(i){ return i >= 0; });
+  var sts = idx.map(function(i){ return stepStatus(u, ss[i]); });
+  var okN = sts.filter(function(x){ return x === 'ok'; }).length, ngN = sts.filter(function(x){ return x === 'ng'; }).length, any = sts.some(function(x){ return x; });
+  return {first:idx[0], idx:idx, cls: ngN ? 'ng' : okN === idx.length ? 'ok' : any ? 'part' : '', txt: ngN ? 'NG '+ngN : okN === idx.length ? '완료' : any ? '진행 중' : '대기'};
+}
+function effortCard(u, ph){
+  var E = ensureEst(), proc = E.procs.filter(function(p){ return p.flow === FLOW_OF[ph]; })[0];
+  if(!proc) return '';
+  var logs = E.logs.filter(function(l){ return l.proc === proc.id && (l.unit === u.id || (!l.unit && (ph === 'in' || ph === 'qc'))); });
+  var sum = logs.reduce(function(a, l){ return a + (num(l.men)||0)*(num(l.hours)||0); }, 0);
+  var d = flDraft;
+  var h = '<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">공수 기록</h2><span class="muted">'+esc(proc.name)+' · '+(ph==='in'||ph==='qc'?'공통':esc(u.name))+' · 누계 '+fmt(sum,1)+' MH</span></div>';
+  h += '<div class="grid2" style="grid-template-columns:1fr 1fr 1fr;margin-top:8px"><div><label>인원</label><input inputmode="decimal" data-fl="men" value="'+(d.men===null||d.men===undefined?'':d.men)+'"></div><div><label>시간 (h)</label><input inputmode="decimal" data-fl="hours" value="'+(d.hours===null||d.hours===undefined?'':d.hours)+'"></div><div><label>할증</label><select data-fl="ot">'+[0,50,100].map(function(o){ return '<option value="'+o+'"'+(+d.ot===o?' selected':'')+'>'+(o?'+'+o+'%':'없음')+'</option>'; }).join('')+'</select></div></div>';
+  h += '<div class="f"><input data-fl="memo" value="'+esc(d.memo||'')+'" placeholder="메모 (대기·재작업 사유 등)"></div>';
+  h += '<button class="btn sec" style="width:100%;margin-top:8px" data-fladd="'+proc.id+'|'+((ph==='in'||ph==='qc')?'':u.id)+'">오늘 공수 기록</button>';
+  if(logs.length) h += '<table style="margin-top:8px"><tr><th>날짜</th><th>인원×h</th><th>메모</th><th></th></tr>' + logs.slice(-5).reverse().map(function(l){ return '<tr><td>'+esc(l.date)+'</td><td>'+fmt(num(l.men))+'×'+fmt(num(l.hours))+(num(l.ot)?' (+'+l.ot+'%)':'')+'</td><td style="text-align:left">'+esc(l.memo||'')+'</td><td><button class="btn sec sm" data-ldel2="'+l.id+'" style="min-height:30px;padding:3px 8px">×</button></td></tr>'; }).join('') + '</table>';
+  return h + '<div class="muted" style="margin-top:6px">여기 기록한 공수는 견적 탭 작업 실적에 자동으로 들어갑니다.</div></div>';
+}
+var flDraft = {men:null, hours:null, ot:0, memo:''};
+function recvPanel(){
+  var L = recvList();
+  if(!L.length) return '<div class="banner warn">견적 탭 → 파츠에 부품과 볼트·너트를 먼저 등록하세요.</div><button class="btn sec" style="width:100%;margin-top:8px" data-gotoparts="1">파츠 등록하러 가기</button>';
+  var h = '<table style="margin-top:8px"><tr><th>자재</th><th>필요</th><th>입고</th><th>상태</th></tr>';
+  L.forEach(function(x){
+    var g = num(state.recv[x.key]), st = x.need === null ? '수량 미정' : g === null ? '' : g >= x.need ? 'OK' : '부족 '+fmt(x.need-g,0);
+    h += '<tr><td>'+esc(x.name)+'<br><span class="muted" style="font-size:11px">'+esc(x.sub)+'</span></td><td>'+(x.need===null?'—':fmt(x.need,0))+'</td><td><input inputmode="decimal" data-rv="'+esc(x.key)+'" value="'+(g===null?'':g)+'" style="width:70px;padding:6px;border:1px solid var(--line);border-radius:8px;text-align:right"></td><td class="'+(st==='OK'?'ok':st&&st!=='수량 미정'?'ng':'')+'" id="rvs-'+esc(x.key)+'">'+st+'</td></tr>';
+  });
+  return h + '</table><button class="btn sec sm" style="margin-top:8px" data-recvall="1">필요 수량만큼 모두 입고</button>';
+}
+function asmPanel(u){
+  var E = ensureEst();
+  if(!E.comps.length) return '<div class="banner warn">견적 탭 → 파츠에 부품과 체결 자재를 먼저 등록하세요.</div><button class="btn sec" style="width:100%;margin-top:8px" data-gotoparts="1">파츠 등록하러 가기</button>';
+  var h = '';
+  E.comps.forEach(function(c, i){
+    var per = num(c.qty), nU = c.perUnit === false ? null : per, a = u.asm[c.id] || {};
+    h += '<div class="field"><div class="lbl">'+esc(c.name||('부품 '+(i+1)))+' <span class="muted">× '+(nU===null?(per===null?'—':fmt(per,0)+' (공사 전체)'):fmt(nU,0)+' / 호기')+'</span></div>';
+    if(c.items.length) h += '<table style="margin-top:4px"><tr><th>체결 자재</th><th>개/부품</th><th>이 호기</th></tr>' + c.items.map(function(it){ var q = num(it.qty); return '<tr><td>'+esc(it.kind)+' '+esc(it.spec||'')+(it.memo?'<br><span class="muted" style="font-size:11px">'+esc(it.memo)+'</span>':'')+'</td><td>'+(q===null?'—':fmt(q,0))+'</td><td><b>'+(q===null||nU===null?'—':fmt(q*nU,0))+'</b></td></tr>'; }).join('') + '</table>';
+    else h += '<div class="muted">체결 자재 미등록</div>';
+    h += '<div class="row" style="margin-top:6px"><label class="chk" style="flex:1;margin:0;padding:8px"><input type="checkbox" data-asm="'+c.id+'|done"'+(a.done?' checked':'')+'><span>체결</span></label><label class="chk" style="flex:1;margin:0;padding:8px"><input type="checkbox" data-asm="'+c.id+'|tq"'+(a.tq?' checked':'')+'><span>토크 확인</span></label></div></div>';
+  });
+  return h;
+}
+function sizeGate(u){
+  return '<div class="card"><h2>'+esc(u.name)+' 설비 크기 입력</h2><div class="muted">라인마킹 기준 치수입니다. 도면의 본체 외곽 치수를 넣으세요.</div>'
+    + '<div class="grid2 f"><div><label>가로 = 길이 L (mm)</label><input inputmode="decimal" data-sz="L" value="'+(u.L||'')+'"></div><div><label>세로 = 폭 W (mm)</label><input inputmode="decimal" data-sz="W" value="'+(u.W||'')+'"></div></div>'
+    + ((state.settings.presets||[]).length ? '<div class="muted" style="margin-top:8px">저장된 크기</div><div class="rounds">'+state.settings.presets.map(function(p, i){ return '<button data-preset="'+i+'">'+esc(p.name)+' '+fmt(p.L,0)+'×'+fmt(p.W,0)+'</button>'; }).join('')+'</div>' : '') + '</div>';
+}
+
 function renderWork(){
+  if(!state.setupDone){ main.innerHTML = wizardHtml(); document.getElementById('stepnav').classList.add('hide'); return; }
   var u = state.units[state.cur.unit];
-  if(!u){ main.innerHTML = '<div class="card">설비 탭에서 호기를 추가하세요.</div>'; return; }
+  if(!u){ main.innerHTML = '<div class="card">설비 탭에서 호기를 추가하세요.</div>'; document.getElementById('stepnav').classList.add('hide'); return; }
   var ss = steps(u);
   if(state.cur.step >= ss.length) state.cur.step = ss.length - 1;
-  var st = ss[state.cur.step], S = state.settings;
+  var st = ss[state.cur.step], S = state.settings, ph = phaseOf(st);
+  var needSize = (ph === 'mark' || ph === 'pos' || ph === 'level') && !sizeOk(u);
   var h = unitChips();
-  h += sizeBar(u);
-  h += '<div class="seg" style="margin-bottom:10px">' + PHASES.map(function(ph){
-    var idx = ss.map(function(x, i){ return phaseOf(x) === ph.id ? i : -1; }).filter(function(i){ return i >= 0; });
-    var sts = idx.map(function(i){ return stepStatus(u, ss[i]); });
-    var okN = sts.filter(function(x){ return x === 'ok'; }).length, ngN = sts.filter(function(x){ return x === 'ng'; }).length;
-    var on = phaseOf(st) === ph.id;
-    return '<button data-phase="'+idx[0]+'" class="'+(on?'on':'')+'" style="font-size:14px;line-height:1.25;padding:8px 2px">'+ph.t+'<br><span style="font-size:12px;font-weight:600;'+(on?'':'color:'+(ngN?'var(--ng)':okN===idx.length?'var(--ok)':'var(--muted)'))+'">'+(ngN?'NG '+ngN:okN===idx.length?'완료':okN+'/'+idx.length)+'</span></button>';
+  if(sizeOk(u)) h += sizeBar(u);
+  h += '<div class="pgrid">' + PHASES.map(function(P, n){
+    var b = phaseBadge(u, ss, P);
+    return '<button data-phase="'+b.first+'" class="'+(P.id===ph?'on ':'')+b.cls+'"><i>'+(n+1)+'</i><b>'+P.t+'</b><span>'+b.txt+'</span></button>';
   }).join('') + '</div>';
-  h += '<div class="card"><div class="dots">' + ss.map(function(s, i){
-    var t = stepStatus(u, s);
-    return '<button data-step="'+i+'" class="'+(i===state.cur.step?'on ':'')+(t==='ok'?'ok':t==='ng'?'ng':'')+'">'+(i+1)+'</button>';
+  if(needSize){ main.innerHTML = h + sizeGate(u); return; }
+  var pb = phaseBadge(u, ss, PHASES.filter(function(P){ return P.id === ph; })[0]), pos = pb.idx.indexOf(state.cur.step);
+  h += '<div class="card">';
+  if(pb.idx.length > 1) h += '<div class="dots">' + pb.idx.map(function(i, j){
+    var t = stepStatus(u, ss[i]);
+    return '<button data-step="'+i+'" class="'+(i===state.cur.step?'on ':'')+(t==='ok'?'ok':t==='ng'?'ng':'')+'">'+(j+1)+'</button>';
   }).join('') + '</div>';
-  h += '<div class="muted">'+esc(u.name)+' · '+(state.cur.step+1)+' / '+ss.length+' 단계</div>';
+  var phName = PHASES.filter(function(P){ return P.id === ph; })[0].t;
+  h += '<div class="muted">'+esc(u.name)+' · '+(PHASES.map(function(P){ return P.id; }).indexOf(ph)+1)+'. '+phName+(pb.idx.length>1?' · '+(pos+1)+' / '+pb.idx.length:'')+'</div>';
   h += '<h2>'+esc(st.title)+'</h2>';
   h += '<div class="prog"><i style="width:'+((state.cur.step+1)/ss.length*100)+'%"></i></div>';
-  if(!st.level) h += diagram(u, st.hl);
+  if(ph === 'mark' || ph === 'pos' || st.done) h += diagram(u, st.hl);
   h += '<ul class="how">' + st.how.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join('') + '</ul>';
   if(st.note) h += '<div class="banner warn">'+esc(st.note)+'</div>';
 
@@ -512,6 +624,11 @@ function renderWork(){
     });
   }
   if(st.level) h += levelPanel(u);
+  if(st.recv) h += recvPanel();
+  if(st.asm) h += asmPanel(u);
+  if(st.checks && ['qc','setup','stab','final'].indexOf(ph) >= 0) h += '<div class="row f"><input id="xcText" placeholder="체크 항목 추가 (공사 전체 적용)" style="flex:1;padding:10px;border:1px solid var(--line);border-radius:10px"><button class="btn sec sm" data-xcadd="'+ph+'">추가</button></div>';
+  if(st.runlog) h += '<div class="grid2 f"><div><label>연속 운전 시간 (h)</label><input inputmode="decimal" data-u="runH" value="'+esc(u.runH||'')+'"></div><div><label>알람·이상 건수</label><input inputmode="decimal" data-u="alarms" value="'+esc(u.alarms||'')+'"></div></div>';
+  if(st.notes) h += '<div class="f"><label>메모</label><textarea rows="3" data-note="'+ph+'">'+esc((u.notes||{})[ph]||'')+'</textarea></div>';
   if(st.photo){
     var p = photos[u.id] || {};
     h += '<div class="photos">' + st.slots.map(function(sl, i){
@@ -519,6 +636,7 @@ function renderWork(){
     }).join('') + '</div><div class="muted" style="margin-top:6px">사진은 이 휴대폰에만 저장됩니다.</div>';
   }
   if(st.done){
+    h += '<h3>공정별 상태</h3><table><tr><th>공정</th><th>상태</th></tr>' + PHASES.map(function(P){ var b = phaseBadge(u, ss, P); return '<tr><td>'+P.t+'</td><td class="'+(b.cls==='ok'?'ok':b.cls==='ng'?'ng':'')+'">'+b.txt+'</td></tr>'; }).join('') + '</table>';
     h += '<h3>라인마킹·위치</h3>' + summaryTable(u);
     h += '<h3>레벨링</h3>' + levSummary(u);
     h += '<div class="grid2" style="margin-top:10px"><div><label>작업자</label><input data-u="worker" value="'+esc(u.worker||S.worker||'')+'"></div><div><label>확인자</label><input data-u="checker" value="'+esc(u.checker||'')+'"></div></div>';
@@ -527,6 +645,7 @@ function renderWork(){
     else h += (pr.ng?'<div class="banner ng">NG 단계가 '+pr.ng+'개 있습니다. 해결 후 완료하세요.</div>':'') + (pr.ok < pr.total-1 ? '<div class="banner warn">아직 끝나지 않은 단계: '+ss.filter(function(x){ return !x.done && stepStatus(u,x) !== 'ok'; }).map(function(x){ return x.title; }).join(', ')+'</div>' : '') + '<button class="btn ok" style="width:100%;margin-top:10px" id="markDone">'+esc(u.name)+' 완료 처리</button>';
   }
   h += '</div>';
+  h += effortCard(u, ph);
   main.innerHTML = h;
   document.getElementById('prevBtn').disabled = state.cur.step === 0;
   var nb = document.getElementById('nextBtn');
@@ -612,6 +731,7 @@ function renderSetup(){
   });
   h += '<button class="btn" style="width:100%" id="addUnit">호기 추가</button>';
   h += '<button class="btn sec" style="width:100%;margin-top:10px" id="resetAll">실측 기록 모두 지우기</button>';
+  h += '<button class="btn ng" style="width:100%;margin-top:10px" id="newProject">새 공사 시작 (모든 데이터 초기화)</button>';
   main.innerHTML = h;
 }
 function fi(i, k, label, type){
@@ -634,7 +754,7 @@ function renderRecord(){
   main.innerHTML = h;
 }
 
-function curU(){ return state.units[state.cur.unit] || {L:7430, W:1462}; }
+function curU(){ var u = state.units[state.cur.unit]; return (u && u.L > 0 && u.W > 0) ? u : {L:'', W:''}; }
 function renderCalc(){
   var h = '';
   h += '<div class="card calc"><h2>대각선 계산</h2><div class="grid2"><div><label>길이 mm</label><input inputmode="decimal" id="cL" value="'+curU().L+'"></div><div><label>폭 mm</label><input inputmode="decimal" id="cW" value="'+curU().W+'"></div></div><div class="out" id="cD"></div><div class="muted">√(길이² + 폭²)</div></div>';
@@ -849,8 +969,38 @@ document.getElementById('nextBtn').addEventListener('click', function(){
 });
 
 main.addEventListener('click', function(e){
-  var t = e.target.closest('[data-phase],#sizeToggle,#presetSave,#sizeAll,[data-preset],[data-unit],[data-step],[data-say],[data-off],[data-del],[data-clearph],[data-lvkind],[data-lvref],[data-lvround],[data-lvnew],#markDone,#undoDone,#addUnit,#resetAll,#csvBtn,#copyBtn');
+  var t = e.target.closest('#newProject,#wzGo,[data-fladd],[data-ldel2],[data-recvall],[data-gotoparts],[data-xcadd],[data-phase],#sizeToggle,#presetSave,#sizeAll,[data-preset],[data-unit],[data-step],[data-say],[data-off],[data-del],[data-clearph],[data-lvkind],[data-lvref],[data-lvround],[data-lvnew],#markDone,#undoDone,#addUnit,#resetAll,#csvBtn,#copyBtn');
   if(!t) return;
+  if(t.id === 'newProject'){ confirmBox('모든 호기·실측·레벨링·견적 데이터를 지우고 처음 설정부터 다시 시작할까요? 필요하면 먼저 기록·견적을 CSV로 저장하세요.', function(){ state = defaultState(); photos = {}; savePhotos(); save(); render(); window.scrollTo(0,0); }); return; }
+  if(t.id === 'wzGo'){
+    var gv = function(id){ return (document.getElementById(id).value||'').trim(); };
+    var Lw = num(gv('wzL')), Ww = num(gv('wzW')), names = gv('wzUnits').split(/[,，\n]+/).map(function(x){ return x.trim(); }).filter(Boolean);
+    if(!(Lw > 0) || !(Ww > 0)){ toast('가로·세로를 mm로 입력하세요'); return; }
+    if(!names.length) names = ['1호기'];
+    var kind = gv('wzKind') || '설비', xv = num(gv('wzX'));
+    state.units = names.map(function(nm){ var nu = defaultUnit(nm,'',''); nu.L = Lw; nu.W = Ww; nu.X = xv; return nu; });
+    state.settings.presets = state.settings.presets || [];
+    if(!state.settings.presets.some(function(p){ return p.name === kind; })) state.settings.presets.push({name:kind, L:Lw, W:Ww});
+    ensureEst().project.name = gv('wzProj') || ensureEst().project.name;
+    state.setupDone = true; state.cur = {unit:0, step:0};
+    save(); render(); toast('설정 완료 — 1. 자재 입고부터 시작합니다'); return;
+  }
+  if(t.dataset.fladd){
+    var fa = t.dataset.fladd.split('|'), E2 = ensureEst();
+    if(num(flDraft.men) === null || num(flDraft.hours) === null){ toast('인원과 시간을 입력하세요'); return; }
+    var dd = new Date(), ds = dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');
+    E2.logs.push({id:uid(), date:ds, proc:fa[0], unit:fa[1]||'', men:num(flDraft.men), hours:num(flDraft.hours), ot:+flDraft.ot||0, memo:flDraft.memo||''});
+    flDraft = {men:flDraft.men, hours:null, ot:0, memo:''};
+    save(); render(); toast('공수 기록'); return;
+  }
+  if(t.dataset.ldel2){ var E3 = ensureEst(); E3.logs = E3.logs.filter(function(l){ return l.id !== t.dataset.ldel2; }); save(); render(); return; }
+  if(t.dataset.recvall){ recvList().forEach(function(x){ if(x.need !== null) state.recv[x.key] = x.need; }); save(); render(); return; }
+  if(t.dataset.gotoparts){ state.tab = 'est'; ensureEst().sub = 'parts'; save(); render(); window.scrollTo(0,0); return; }
+  if(t.dataset.xcadd){
+    var tx = (document.getElementById('xcText').value||'').trim(); if(!tx) return;
+    var ex = state.extraChecks[t.dataset.xcadd] || (state.extraChecks[t.dataset.xcadd] = []);
+    ex.push({k:'x'+uid(), t:tx}); save(); render(); return;
+  }
   if(t.dataset.phase !== undefined){ state.cur.step = +t.dataset.phase; save(); render(); window.scrollTo(0,0); return; }
   if(t.id === 'sizeToggle'){ sizeOpen = !sizeOpen; render(); return; }
   if(t.dataset.preset !== undefined){ var pr = state.settings.presets[+t.dataset.preset], cu = state.units[state.cur.unit]; cu.L = pr.L; cu.W = pr.W; save(); render(); toast(cu.name+' → '+pr.name); return; }
@@ -886,6 +1036,14 @@ main.addEventListener('click', function(e){
 
 main.addEventListener('input', function(e){
   var t = e.target;
+  if(t.dataset.fl){ flDraft[t.dataset.fl] = (t.dataset.fl==='men'||t.dataset.fl==='hours') ? num(t.value) : t.value; return; }
+  if(t.dataset.rv !== undefined){
+    state.recv[t.dataset.rv] = num(t.value);
+    var x = recvList().filter(function(y){ return y.key === t.dataset.rv; })[0], g = num(t.value), cell = t.closest('tr') && t.closest('tr').cells[3];
+    if(x && cell){ var stt = x.need === null ? '수량 미정' : g === null ? '' : g >= x.need ? 'OK' : '부족 '+fmt(x.need-g,0); cell.textContent = stt; cell.className = stt==='OK'?'ok':stt&&stt!=='수량 미정'?'ng':''; }
+    save(); return;
+  }
+  if(t.dataset.note){ var un = state.units[state.cur.unit]; (un.notes || (un.notes = {}))[t.dataset.note] = t.value; save(); return; }
   if(t.dataset.lk){
     var lu = state.units[state.cur.unit], LR = ensureLev(lu), rd = LR.rounds[LR.ri];
     rd.v[t.dataset.lk] = num(t.value);
@@ -925,6 +1083,7 @@ main.addEventListener('change', function(e){
   var t = e.target;
   if(t.dataset.sz){ var su = state.units[state.cur.unit]; if(!setSize(su, t.dataset.sz, t.value)) t.value = su[t.dataset.sz]; save(); render(); return; }
   if(t.dataset.ui !== undefined && (t.dataset.uk === 'L' || t.dataset.uk === 'W')){ var su2 = state.units[+t.dataset.ui]; if(!setSize(su2, t.dataset.uk, t.value)) t.value = su2[t.dataset.uk]; save(); render(); return; }
+  if(t.dataset.asm){ var ap = t.dataset.asm.split('|'), ua = state.units[state.cur.unit]; var rec = (ua.asm || (ua.asm = {}))[ap[0]] || (ua.asm[ap[0]] = {}); rec[ap[1]] = t.checked; save(); refreshDots(ua); return; }
   if(t.dataset.lvchk){ ensureLev(state.units[state.cur.unit]).checks[t.dataset.lvchk] = t.checked; save(); return; }
   if(t.dataset.lv === 'n' || t.dataset.lv === 'xs'){ ensureLev(state.units[state.cur.unit]).cfgOpen = true; render(); return; }
   if(t.dataset.chk){ var u = state.units[state.cur.unit]; u.checks[t.dataset.chk] = t.checked; refreshDots(u); save(); return; }
@@ -933,8 +1092,12 @@ main.addEventListener('change', function(e){
 });
 function refreshDots(u){
   var ss = steps(u);
-  document.querySelectorAll('.dots button').forEach(function(b, i){
-    var s = stepStatus(u, ss[i]); b.classList.toggle('ok', s==='ok'); b.classList.toggle('ng', s==='ng');
+  document.querySelectorAll('.dots button').forEach(function(b){
+    var s = stepStatus(u, ss[+b.dataset.step]); b.classList.toggle('ok', s==='ok'); b.classList.toggle('ng', s==='ng');
+  });
+  document.querySelectorAll('.pgrid button').forEach(function(b, n){
+    var P = PHASES[n]; if(!P) return; var bd = phaseBadge(u, ss, P);
+    b.classList.remove('ok','ng','part'); if(bd.cls) b.classList.add(bd.cls); var sp = b.querySelector('span'); if(sp) sp.textContent = bd.txt;
   });
 }
 
@@ -1030,7 +1193,7 @@ document.getElementById('modalYes').onclick = function(){ document.getElementByI
 
 /* ---------- 견적 · 공수 · 파츠 ---------- */
 function uid(){ return Math.random().toString(36).slice(2,9); }
-var STD_PROCS = [
+var STD_PROCS_OLD = [
   ['자재 입고·하차·수량 검수', false], ['자재 보관·현장 내 운반', false], ['설비 반입·양중', true],
   ['라인마킹', true], ['설비 위치 맞춤', true], ['레벨링', true], ['모듈 조립·체결', true],
   ['앵커·고정', true], ['토크 확인·체결 마킹', true], ['사진·기록·검수 대응', true],
@@ -1041,19 +1204,38 @@ var PART_PRESETS = [
   {cat:'앵커', name:'앵커볼트', spec:''}, {cat:'레벨링', name:'레벨링 풋', spec:'', auto:'feet'},
   {cat:'레벨링', name:'레벨링 풋 락너트', spec:'', auto:'feet'}, {cat:'소모품', name:'마킹 테이프', spec:''}
 ];
+var STD_PROCS = [
+  ['자재 입고·하차', false, 'in'], ['입고 검수', false, 'qc'], ['자재 보관·현장 내 운반', false, null],
+  ['라인마킹', true, 'mark'], ['설비 반입·양중·위치 맞춤', true, 'pos'], ['모듈 조립·체결', true, 'asm'],
+  ['레벨링·락너트', true, 'lev'], ['앵커·고정', true, null], ['셋업', true, 'setup'], ['안정화', true, 'stab'],
+  ['최종 검수·인계', true, 'final'], ['정리·청소·폐기물', false, null], ['안전교육·TBM', false, null], ['대기·이동', false, null]
+];
+function syncProcs(E){
+  var guess = {'in':/입고/, 'qc':/검수/, 'mark':/마킹/, 'pos':/반입|위치/, 'asm':/조립|체결/, 'lev':/레벨/, 'setup':/셋업/, 'stab':/안정화/, 'final':/최종|인계/};
+  STD_PROCS.forEach(function(sp, i){
+    if(!sp[2]) return;
+    if(E.procs.some(function(p){ return p.flow === sp[2]; })) return;
+    var m = E.procs.filter(function(p){ return !p.flow && guess[sp[2]].test(p.name) && !(sp[2]==='qc' && /입고·하차·수량/.test(p.name) === false && /입고/.test(p.name) && !/검수/.test(p.name)); })[0];
+    if(sp[2] === 'in') m = E.procs.filter(function(p){ return !p.flow && /입고/.test(p.name); })[0];
+    if(sp[2] === 'qc') m = E.procs.filter(function(p){ return !p.flow && /검수/.test(p.name) && !/입고·하차/.test(p.name) && !/최종|사진/.test(p.name); })[0];
+    if(m) m.flow = sp[2];
+    else E.procs.splice(Math.min(i, E.procs.length), 0, {id:uid(), name:sp[0], perUnit:sp[1], grade:'g1', men:null, hours:null, na:false, std:true, flow:sp[2]});
+  });
+}
 function ensureEst(){
   if(!state.est){
     state.est = {
       sub:'plan', project:{name:'', client:'', site:'', date:''},
       hpd:8,
       grades:[{id:'g1', name:'기술자', rate:null},{id:'g2', name:'보조', rate:null}],
-      procs: STD_PROCS.map(function(p){ return {id:uid(), name:p[0], perUnit:p[1], grade:'g1', men:null, hours:null, na:false, std:true}; }),
+      procs: STD_PROCS.map(function(p){ return {id:uid(), name:p[0], perUnit:p[1], grade:'g1', men:null, hours:null, na:false, std:true, flow:p[2]}; }),
       logs:[], parts:[],
       exps: STD_EXPS.map(function(n){ return {id:uid(), name:n, amt:null, na:false, std:true}; }),
       overhead:null, profit:null, vat:10, basis:'actual'
     };
   }
   if(!state.est.comps) state.est.comps = [];
+  if(!state.est._flowSynced){ syncProcs(state.est); state.est._flowSynced = true; }
   if(!state.est.prices) state.est.prices = {};
   if(state.est.fSpare === undefined) state.est.fSpare = 5;
   return state.est;
